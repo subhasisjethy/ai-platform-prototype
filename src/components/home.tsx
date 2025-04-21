@@ -54,8 +54,12 @@ const Home = () => {
       <nav className="border-b border-border">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center space-x-2">
-            <Zap className="h-6 w-6 text-primary" />
-            <span className="text-xl font-bold">AI Platform</span>
+            <img
+              src="https://www.alefeducation.com/_next/image?url=https%3A%2F%2Fcms-backend-prod.alefeducation.com%2Fwp-content%2Fuploads%2F2024%2F09%2Flogo_main-alef-education.webp&w=384&q=75"
+              alt="Alef Education Logo"
+              className="h-8 w-auto"
+            />
+            <span className="text-xl font-bold">Alef AI Platform</span>
           </div>
 
           <div className="flex items-center space-x-4">
@@ -135,9 +139,12 @@ const Home = () => {
                   your data.
                 </p>
               </CardContent>
-              <CardFooter>
-                <Button variant="outline" size="sm" className="w-full" asChild>
+              <CardFooter className="flex gap-2">
+                <Button variant="outline" size="sm" className="flex-1" asChild>
                   <Link to="/documentation/rag">Learn More</Link>
+                </Button>
+                <Button variant="default" size="sm" className="flex-1" asChild>
+                  <Link to="/rag">Try Now</Link>
                 </Button>
               </CardFooter>
             </Card>
@@ -316,8 +323,12 @@ const Home = () => {
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center space-x-2 mb-4 md:mb-0">
-              <Zap className="h-5 w-5 text-primary" />
-              <span className="font-semibold">AI Platform</span>
+              <img
+                src="https://www.alefeducation.com/_next/image?url=https%3A%2F%2Fcms-backend-prod.alefeducation.com%2Fwp-content%2Fuploads%2F2024%2F09%2Flogo_main-alef-education.webp&w=384&q=75"
+                alt="Alef Education Logo"
+                className="h-6 w-auto"
+              />
+              <span className="font-semibold">Alef AI Platform</span>
             </div>
             <div className="flex space-x-6">
               <Link
@@ -347,7 +358,7 @@ const Home = () => {
             </div>
           </div>
           <div className="mt-6 text-center text-sm text-muted-foreground">
-            &copy; {new Date().getFullYear()} AI Platform. All rights reserved.
+            &copy; {new Date().getFullYear()} Alef AI Platform. All rights reserved.
           </div>
         </div>
       </footer>

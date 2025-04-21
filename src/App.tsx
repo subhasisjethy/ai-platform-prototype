@@ -10,6 +10,7 @@ const AnalyticsDashboard = lazy(
   () => import("./components/AnalyticsDashboard"),
 );
 const ApiSandbox = lazy(() => import("./components/ApiSandbox"));
+const RagEngine = lazy(() => import("./components/rag/RagEngine"));
 
 function App() {
   return (
@@ -21,6 +22,8 @@ function App() {
           <Route path="/api-key-manager" element={<ApiKeyManager />} />
           <Route path="/analytics-dashboard" element={<AnalyticsDashboard />} />
           <Route path="/api-sandbox" element={<ApiSandbox />} />
+          <Route path="/rag" element={<RagEngine />} />
+          <Route path="/documentation/rag" element={<RagEngine />} />
         </Routes>
         {import.meta.env.VITE_TEMPO === "true" && useRoutes(routes)}
       </>

@@ -24,6 +24,7 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { ClipboardCopy, Play, Code, Settings, RefreshCw } from "lucide-react";
+import Navbar from "@/components/ui/navbar";
 
 interface ApiResponse {
   status: "success" | "error";
@@ -135,7 +136,7 @@ const ApiSandbox = () => {
 
       setResponse(
         mockResponses[
-          selectedService as keyof typeof mockResponses
+        selectedService as keyof typeof mockResponses
         ] as ApiResponse,
       );
       setIsLoading(false);
@@ -537,85 +538,49 @@ const ApiSandbox = () => {
   };
 
   return (
-    <div className="bg-background p-6 rounded-lg w-full max-w-6xl mx-auto">
-      <div className="flex flex-col space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">API Sandbox</h1>
-          <p className="text-muted-foreground">
-            Test our AI services and generate code for your applications
-          </p>
-        </div>
+    <div className="min-h-screen bg-background">
+      <Navbar showBackButton title="API Sandbox" />
+      <div className="container mx-auto p-4">
+        <div className="bg-background p-6 rounded-lg w-full max-w-6xl mx-auto">
+          <div className="flex flex-col space-y-6">
+            <div>
+              <h1 className="text-2xl font-bold">API Sandbox</h1>
+              <p className="text-muted-foreground">
+                Test our AI services and generate code for your applications
+              </p>
+            </div>
 
-        <Tabs
-          defaultValue="rag"
-          value={selectedService}
-          onValueChange={setSelectedService}
-          className="w-full"
-        >
-          <TabsList className="grid grid-cols-4 mb-6">
-            <TabsTrigger value="rag">RAG</TabsTrigger>
-            <TabsTrigger value="summarization">Summarization</TabsTrigger>
-            <TabsTrigger value="translation">Translation</TabsTrigger>
-            <TabsTrigger value="tts">Text-to-Speech</TabsTrigger>
-          </TabsList>
+            <Tabs
+              defaultValue="rag"
+              value={selectedService}
+              onValueChange={setSelectedService}
+              className="w-full"
+            >
+              <TabsList className="grid grid-cols-4 mb-6">
+                <TabsTrigger value="rag">RAG</TabsTrigger>
+                <TabsTrigger value="summarization">Summarization</TabsTrigger>
+                <TabsTrigger value="translation">Translation</TabsTrigger>
+                <TabsTrigger value="tts">Text-to-Speech</TabsTrigger>
+              </TabsList>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Settings className="h-5 w-5 mr-2" />
-                  Request Parameters
-                </CardTitle>
-                <CardDescription>
-                  Configure the parameters for your API request
-                </CardDescription>
-              </CardHeader>
-              <CardContent>{renderServiceParams()}</CardContent>
-              <CardFooter className="flex justify-between">
-                <Button variant="outline" onClick={copyCode}>
-                  <ClipboardCopy className="h-4 w-4 mr-2" />
-                  Copy Code
-                </Button>
-                <Button onClick={executeRequest} disabled={isLoading}>
-                  {isLoading ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-4 w-4 mr-2" />
-                      Execute Request
-                    </>
-                  )}
-                </Button>
-              </CardFooter>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Code className="h-5 w-5 mr-2" />
-                  Response
-                </CardTitle>
-                <CardDescription>
-                  View the API response and metadata
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {response ? (
-                  renderResponse()
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-[300px] text-center">
-                    <div className="text-muted-foreground mb-4">
-                      Configure your parameters and click "Execute Request" to
-                      see the response
-                    </div>
-                    <Button
-                      variant="outline"
-                      onClick={executeRequest}
-                      disabled={isLoading}
-                    >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <Settings className="h-5 w-5 mr-2" />
+                      Request Parameters
+                    </CardTitle>
+                    <CardDescription>
+                      Configure the parameters for your API request
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>{renderServiceParams()}</CardContent>
+                  <CardFooter className="flex justify-between">
+                    <Button variant="outline" onClick={copyCode}>
+                      <ClipboardCopy className="h-4 w-4 mr-2" />
+                      Copy Code
+                    </Button>
+                    <Button onClick={executeRequest} disabled={isLoading}>
                       {isLoading ? (
                         <>
                           <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
@@ -628,18 +593,57 @@ const ApiSandbox = () => {
                         </>
                       )}
                     </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </Tabs>
+                  </CardFooter>
+                </Card>
 
-        <div className="bg-muted p-4 rounded-md">
-          <h3 className="text-sm font-medium mb-2">Code Sample</h3>
-          <pre className="text-xs overflow-auto p-2 bg-background rounded border">
-            {selectedService === "rag" &&
-              `fetch('https://api.aiplatform.example/v1/rag', {
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <Code className="h-5 w-5 mr-2" />
+                      Response
+                    </CardTitle>
+                    <CardDescription>
+                      View the API response and metadata
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {response ? (
+                      renderResponse()
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-[300px] text-center">
+                        <div className="text-muted-foreground mb-4">
+                          Configure your parameters and click "Execute Request" to
+                          see the response
+                        </div>
+                        <Button
+                          variant="outline"
+                          onClick={executeRequest}
+                          disabled={isLoading}
+                        >
+                          {isLoading ? (
+                            <>
+                              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                              Processing...
+                            </>
+                          ) : (
+                            <>
+                              <Play className="h-4 w-4 mr-2" />
+                              Execute Request
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </Tabs>
+
+            <div className="bg-muted p-4 rounded-md">
+              <h3 className="text-sm font-medium mb-2">Code Sample</h3>
+              <pre className="text-xs overflow-auto p-2 bg-background rounded border">
+                {selectedService === "rag" &&
+                  `fetch('https://api.aiplatform.example/v1/rag', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -647,8 +651,8 @@ const ApiSandbox = () => {
   },
   body: JSON.stringify(${JSON.stringify(requestParams.rag, null, 2)})
 })`}
-            {selectedService === "summarization" &&
-              `fetch('https://api.aiplatform.example/v1/summarize', {
+                {selectedService === "summarization" &&
+                  `fetch('https://api.aiplatform.example/v1/summarize', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -656,8 +660,8 @@ const ApiSandbox = () => {
   },
   body: JSON.stringify(${JSON.stringify(requestParams.summarization, null, 2)})
 })`}
-            {selectedService === "translation" &&
-              `fetch('https://api.aiplatform.example/v1/translate', {
+                {selectedService === "translation" &&
+                  `fetch('https://api.aiplatform.example/v1/translate', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -665,8 +669,8 @@ const ApiSandbox = () => {
   },
   body: JSON.stringify(${JSON.stringify(requestParams.translation, null, 2)})
 })`}
-            {selectedService === "tts" &&
-              `fetch('https://api.aiplatform.example/v1/text-to-speech', {
+                {selectedService === "tts" &&
+                  `fetch('https://api.aiplatform.example/v1/text-to-speech', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -674,12 +678,14 @@ const ApiSandbox = () => {
   },
   body: JSON.stringify(${JSON.stringify(requestParams.tts, null, 2)})
 })`}
-          </pre>
-          <div className="flex justify-end mt-2">
-            <Button variant="ghost" size="sm" onClick={copyCode}>
-              <ClipboardCopy className="h-4 w-4 mr-2" />
-              Copy
-            </Button>
+              </pre>
+              <div className="flex justify-end mt-2">
+                <Button variant="ghost" size="sm" onClick={copyCode}>
+                  <ClipboardCopy className="h-4 w-4 mr-2" />
+                  Copy
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
