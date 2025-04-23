@@ -2,9 +2,7 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import Navbar from "@/components/ui/navbar";
 import RagEngine from "@/components/rag/RagEngine";
-import Summarization from "@/components/ai/Summarization";
-import Translation from "@/components/ai/Translation";
-import TextToSpeech from "@/components/ai/TextToSpeech";
+import ExperienceBuilder from "@/components/ai/ExperienceBuilder";
 import {
   Card,
   CardContent,
@@ -16,34 +14,30 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
-  BarChart3,
-  BookOpen,
-  Key,
   LayoutDashboard,
-  PlusCircle,
-  Settings,
-  Terminal,
-  FileText,
-  Languages,
-  Mic,
-  ChevronLeft,
-  MessageSquare,
   Wand2,
   Database,
-  Code,
-  Paintbrush,
-  Copy,
+  MessageSquare,
+  BookOpen,
+  Key,
+  BarChart3,
+  Settings,
+  ChevronLeft,
+  Mic,
+  Send,
+  TrendingUp,
+  Users,
+  Star,
+  Cpu,
+  DollarSign,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
-import { Send } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
+import { AIExperienceConfig, defaultAIConfig, savedConfigs } from '@/types/ai-platform';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { toast } from "@/components/ui/use-toast";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface DashboardProps {
   username?: string;
@@ -71,13 +65,39 @@ interface Message {
   timestamp: Date;
 }
 
-interface ChatConfig {
-  theme: "light" | "dark" | "system";
-  ragEnabled: boolean;
-  selectedKnowledge: string;
-  customStyles: string;
-  apiKey: string;
-}
+// Mock data for deployed experience stats
+const mockExperienceStats = [
+  {
+    id: 'exp-1',
+    name: 'Grade 5 Fractions Video Tutor',
+    interactions: 1250,
+    avgSatisfaction: 4.5,
+    keyCapability: 'AI Tutor'
+  },
+  {
+    id: 'exp-2',
+    name: 'Literature Book Summarizer (G9)',
+    interactions: 820,
+    avgSatisfaction: 4.2,
+    keyCapability: 'Summarizer'
+  },
+  {
+    id: 'exp-3',
+    name: 'Science Assessment RAG (G7)',
+    interactions: 1530,
+    avgSatisfaction: 4.7,
+    keyCapability: 'RAG'
+  },
+];
+
+// Mock data for cost usage
+const mockCostData = [
+  { name: 'G5 Fractions Tutor', cost: 45.50 },
+  { name: 'G9 Lit Summarizer', cost: 22.80 },
+  { name: 'G7 Science RAG', cost: 65.20 },
+  { name: 'Translate Service', cost: 15.00 }, // Example generic service
+  { name: 'Custom Chatbot', cost: 30.75 },
+];
 
 const Dashboard = ({
   username = "Developer",
@@ -126,25 +146,13 @@ const Dashboard = ({
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
-  const [chatConfig, setChatConfig] = useState<ChatConfig>({
-    theme: "system",
-    ragEnabled: false,
-    selectedKnowledge: "",
-    customStyles: "",
-    apiKey: "",
-  });
-  const [knowledgeBases, setKnowledgeBases] = useState([
-    { id: "kb1", name: "Product Documentation" },
-    { id: "kb2", name: "Technical Specs" },
-    { id: "kb3", name: "User Guides" },
-  ]);
-  const [activeSection, setActiveSection] = useState<"chat" | "customize" | "embed">("chat");
+  const [chatPreviewConfig, setChatPreviewConfig] = useState<AIExperienceConfig>(defaultAIConfig);
 
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
   };
 
-  const handleSendMessage = async () => {
+  const handleSendMessage = () => {
     if (inputMessage.trim()) {
       const newMessage: Message = {
         role: "user",
@@ -154,13 +162,16 @@ const Dashboard = ({
       setMessages([...messages, newMessage]);
       setInputMessage("");
 
-      // Simulate AI response with RAG integration
       setTimeout(() => {
+        let responseContent = "How can I help?";
+        if (chatPreviewConfig.capabilities.rag.enabled) {
+          responseContent = `Using knowledge bases (${chatPreviewConfig.capabilities.rag.knowledgeBaseIds.join(', ')}), I can assist...`;
+        } else if (chatPreviewConfig.capabilities.aiTutor.enabled) {
+          responseContent = `As your ${chatPreviewConfig.capabilities.aiTutor.persona} tutor, let's explore...`;
+        }
         const aiResponse: Message = {
           role: "assistant",
-          content: chatConfig.ragEnabled
-            ? "Based on the knowledge base, I can help you with that..."
-            : "I'm here to help! How can I assist you today?",
+          content: responseContent,
           timestamp: new Date(),
         };
         setMessages(prev => [...prev, aiResponse]);
@@ -168,24 +179,12 @@ const Dashboard = ({
     }
   };
 
-  const generateEmbedCode = () => {
-    const code = `
-// Install via npm
-npm install @alef/chat-widget
-
-// Import and use in your React application
-import { AlefChat } from '@alef/chat-widget';
-
-// Add this to your component
-<AlefChat
-  apiKey="${chatConfig.apiKey}"
-  theme="${chatConfig.theme}"
-  ragEnabled={${chatConfig.ragEnabled}}
-  knowledgeBase="${chatConfig.selectedKnowledge}"
-  customStyles={\`${chatConfig.customStyles}\`}
-/>
-`;
-    return code;
+  const loadConfigForChat = (configId: string) => {
+    const loaded = savedConfigs.find(c => c.configId === configId);
+    if (loaded) {
+      setChatPreviewConfig(loaded);
+      setMessages([]);
+    }
   };
 
   return (
@@ -193,544 +192,118 @@ import { AlefChat } from '@alef/chat-widget';
       <Navbar showBackButton title="Dashboard" />
       <div className="container mx-auto p-4">
         <div className="flex h-screen bg-background">
-          {/* Sidebar */}
-          <div className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-background border-r border-border transition-all duration-300 ease-in-out`}>
-            {/* Sidebar Header */}
-            <div className="p-4 flex items-center justify-between">
-              <div className={`flex items-center space-x-2 ${!isSidebarOpen && 'justify-center w-full'}`}>
-                <img
-                  src="https://www.alefeducation.com/_next/image?url=https%3A%2F%2Fcms-backend-prod.alefeducation.com%2Fwp-content%2Fuploads%2F2024%2F09%2Flogo_main-alef-education.webp&w=384&q=75"
-                  alt="Alef Education Logo"
-                  className="h-6 w-auto"
-                />
-                {isSidebarOpen && <span className="font-semibold">Alef AI Platform</span>}
-              </div>
-              {isSidebarOpen && (
-                <button onClick={toggleSidebar}>
-                  <ChevronLeft className="h-6 w-6" />
-                </button>
-              )}
+          <div className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-background border-r border-border transition-all duration-300 ease-in-out p-4`}>
+            <div className="flex items-center justify-between mb-4">
+              {isSidebarOpen && <span className="font-semibold text-lg">AI Platform</span>}
+              <button onClick={toggleSidebar} className="p-1 rounded hover:bg-muted">
+                <ChevronLeft className={`h-5 w-5 transition-transform ${!isSidebarOpen && 'rotate-180'}`} />
+              </button>
             </div>
 
-            <nav className="space-y-2">
-              <Button
-                variant="ghost"
-                className="w-full justify-start"
-                onClick={() => setActiveTab("overview")}
-              >
-                <LayoutDashboard className="mr-2 h-4 w-4" />
-                Dashboard
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full justify-start"
-                onClick={() => setActiveTab("rag")}
-              >
-                <BookOpen className="mr-2 h-4 w-4" />
-                RAG Engine
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full justify-start"
-                onClick={() => setActiveTab("summarization")}
-              >
-                <FileText className="mr-2 h-4 w-4" />
-                Summarization
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full justify-start"
-                onClick={() => setActiveTab("translation")}
-              >
-                <Languages className="mr-2 h-4 w-4" />
-                Translation
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full justify-start"
-                onClick={() => setActiveTab("tts")}
-              >
-                <Mic className="mr-2 h-4 w-4" />
-                Text to Speech
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full justify-start"
-                onClick={() => setActiveTab("documentation")}
-              >
-                <BookOpen className="mr-2 h-4 w-4" />
-                Documentation
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full justify-start"
-                onClick={() => setActiveTab("apikeys")}
-              >
-                <Key className="mr-2 h-4 w-4" />
-                API Keys
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full justify-start"
-                onClick={() => setActiveTab("analytics")}
-              >
-                <BarChart3 className="mr-2 h-4 w-4" />
-                Analytics
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full justify-start"
-                onClick={() => setActiveTab("sandbox")}
-              >
-                <Terminal className="mr-2 h-4 w-4" />
-                Sandbox
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full justify-start"
-                onClick={() => setActiveTab("settings")}
-              >
-                <Settings className="mr-2 h-4 w-4" />
-                Settings
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full justify-start"
-                onClick={() => setActiveSection("chat")}
-              >
-                <MessageSquare className="mr-2 h-4 w-4" />
-                Chat
-              </Button>
-              <Link to="/" className="w-full block mt-4">
-                <Button variant="outline" className="w-full justify-start">
-                  <LayoutDashboard className="mr-2 h-4 w-4" />
-                  Back to Home
-                </Button>
-              </Link>
+            <nav className="space-y-1">
+              <NavButton icon={LayoutDashboard} label="Overview" active={activeTab === "overview"} onClick={() => setActiveTab("overview")} sidebarOpen={isSidebarOpen} />
+              <NavButton icon={Wand2} label="Experience Builder" active={activeTab === "builder"} onClick={() => setActiveTab("builder")} sidebarOpen={isSidebarOpen} />
+              <NavButton icon={Database} label="RAG Engine" active={activeTab === "rag"} onClick={() => setActiveTab("rag")} sidebarOpen={isSidebarOpen} />
+              <NavButton icon={MessageSquare} label="Chat Preview" active={activeTab === "chat"} onClick={() => setActiveTab("chat")} sidebarOpen={isSidebarOpen} />
+              <Separator className="my-2" />
+              <NavButton icon={BookOpen} label="Documentation" active={activeTab === "documentation"} onClick={() => setActiveTab("documentation")} sidebarOpen={isSidebarOpen} />
+              <NavButton icon={Key} label="API Keys" active={activeTab === "apikeys"} onClick={() => setActiveTab("apikeys")} sidebarOpen={isSidebarOpen} />
+              <NavButton icon={BarChart3} label="Analytics" active={activeTab === "analytics"} onClick={() => setActiveTab("analytics")} sidebarOpen={isSidebarOpen} />
+              <NavButton icon={Settings} label="Settings" active={activeTab === "settings"} onClick={() => setActiveTab("settings")} sidebarOpen={isSidebarOpen} />
             </nav>
           </div>
 
-          {/* Main Content */}
           <div className="flex-1 overflow-auto p-6">
-            <div className="mb-6">
-              <h1 className="text-2xl font-bold">Welcome back, {username}!</h1>
-              <p className="text-muted-foreground">
-                Here's an overview of your API usage and recent activity.
-              </p>
-            </div>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsContent value="overview" className="space-y-6">
+                <div className="mb-6">
+                  <h1 className="text-2xl font-bold">Welcome back, {username}!</h1>
+                  <p className="text-muted-foreground">Platform overview and quick actions.</p>
+                </div>
+                <Card>
+                  <CardHeader><CardTitle>Quick Actions</CardTitle></CardHeader>
+                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <Button className="w-full justify-start" onClick={() => setActiveTab("builder")}><Wand2 className="mr-2 h-4 w-4" />Create New Experience</Button>
+                    <Button variant="outline" className="w-full justify-start" onClick={() => setActiveTab("rag")}><Database className="mr-2 h-4 w-4" />Manage Knowledge Bases</Button>
+                    <Button variant="outline" className="w-full justify-start" onClick={() => setActiveTab("documentation")}><BookOpen className="mr-2 h-4 w-4" />View Documentation</Button>
+                  </CardContent>
+                </Card>
 
-            <Tabs
-              defaultValue="overview"
-              value={activeTab}
-              onValueChange={setActiveTab}
-              className="w-full"
-            >
-              <TabsList className="mb-4">
-                <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger value="rag">RAG Engine</TabsTrigger>
-                <TabsTrigger value="summarization">Summarization</TabsTrigger>
-                <TabsTrigger value="translation">Translation</TabsTrigger>
-                <TabsTrigger value="tts">Text to Speech</TabsTrigger>
-                <TabsTrigger value="documentation">Documentation</TabsTrigger>
-                <TabsTrigger value="apikeys">API Keys</TabsTrigger>
-                <TabsTrigger value="analytics">Analytics</TabsTrigger>
-                <TabsTrigger value="sandbox">Sandbox</TabsTrigger>
-                <TabsTrigger value="settings">Settings</TabsTrigger>
-                <TabsTrigger value="chat">Chat</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="overview" className="space-y-4">
-                {/* API Usage Summary */}
+                {/* --- NEW: Deployed Experience Analytics Card --- */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>API Usage Summary</CardTitle>
-                    <CardDescription>
-                      You've used {apiUsage.total} out of {apiUsage.limit} API calls
-                      this month.
-                    </CardDescription>
+                    <CardTitle>Deployed Experience Analytics</CardTitle>
+                    <CardDescription>Usage statistics for your active AI experiences.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {mockExperienceStats.map(stat => (
+                      <Card key={stat.id} className="bg-muted/40">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-base font-medium">{stat.name}</CardTitle>
+                        </CardHeader>
+                        <CardContent className="text-sm text-muted-foreground space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="flex items-center"><Users className="h-4 w-4 mr-2 text-primary/80" /> Interactions</span>
+                            <span className="font-medium text-foreground">{stat.interactions.toLocaleString()}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="flex items-center"><Star className="h-4 w-4 mr-2 text-yellow-500" /> Avg. Satisfaction</span>
+                            <span className="font-medium text-foreground">{stat.avgSatisfaction.toFixed(1)} / 5</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="flex items-center"><Cpu className="h-4 w-4 mr-2 text-purple-500" /> Key Capability</span>
+                            <Badge variant="outline" style={{ borderColor: colors.lightLavender, color: colors.textDark }}>{stat.keyCapability}</Badge>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </CardContent>
+                </Card>
+
+                {/* --- NEW: Cost Usage Chart Card --- */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <DollarSign className="h-5 w-5 mr-2 text-green-600" />
+                      Estimated Cost Usage (Last 30 Days)
+                    </CardTitle>
+                    <CardDescription>Estimated costs associated with deployed experiences and services.</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="mb-4">
-                      <Progress
-                        value={(apiUsage.total / apiUsage.limit) * 100}
-                        className="h-2"
-                      />
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        {Math.round((apiUsage.total / apiUsage.limit) * 100)}% of
-                        monthly quota used
-                      </p>
-                    </div>
-
-                    <div className="space-y-4">
-                      <h4 className="text-sm font-medium">Usage by Service</h4>
-                      {apiUsage.services.map((service) => (
-                        <div
-                          key={service.name}
-                          className="flex items-center justify-between"
+                    <div style={{ width: '100%', height: 300 }}>
+                      <ResponsiveContainer>
+                        <BarChart
+                          data={mockCostData}
+                          margin={{
+                            top: 5,
+                            right: 30,
+                            left: 20,
+                            bottom: 5,
+                          }}
+                          barSize={20}
                         >
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline">{service.name}</Badge>
-                            <span className="text-sm">{service.calls} calls</span>
-                          </div>
-                          <div className="w-1/2">
-                            <Progress
-                              value={service.percentage}
-                              className="h-1.5"
-                            />
-                          </div>
-                        </div>
-                      ))}
+                          <XAxis dataKey="name" scale="point" padding={{ left: 10, right: 10 }} tick={{ fontSize: 10 }} />
+                          <YAxis tickFormatter={(value) => `$${value}`} tick={{ fontSize: 10 }} />
+                          <Tooltip
+                            cursor={{ fill: 'transparent' }}
+                            formatter={(value: number) => [`$${value.toFixed(2)}`, 'Cost']}
+                          />
+                          <Legend wrapperStyle={{ fontSize: '12px' }} />
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={colors.border + '80'} />
+                          <Bar dataKey="cost" fill={colors.primary} background={{ fill: colors.lightLavender + '40' }} radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
                     </div>
                   </CardContent>
                 </Card>
+              </TabsContent>
 
-                {/* Recent Activity */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Recent Activity</CardTitle>
-                    <CardDescription>
-                      Your latest API calls and their status
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {recentActivity.map((activity) => (
-                        <div
-                          key={activity.id}
-                          className="flex items-center justify-between border-b pb-3"
-                        >
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <Badge
-                                variant={
-                                  activity.status === "success"
-                                    ? "default"
-                                    : "destructive"
-                                }
-                              >
-                                {activity.service}
-                              </Badge>
-                              <span className="text-sm font-medium">
-                                {activity.endpoint}
-                              </span>
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                              {activity.timestamp}
-                            </p>
-                          </div>
-                          <Badge
-                            variant={
-                              activity.status === "success"
-                                ? "outline"
-                                : "destructive"
-                            }
-                          >
-                            {activity.status}
-                          </Badge>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Quick Actions */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Quick Actions</CardTitle>
-                    <CardDescription>Common tasks and shortcuts</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                      <Button
-                        className="w-full justify-start"
-                        onClick={() => setActiveTab("apikeys")}
-                      >
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Generate API Key
-                      </Button>
-                      <Button
-                        className="w-full justify-start"
-                        variant="outline"
-                        onClick={() => setActiveTab("documentation")}
-                      >
-                        <BookOpen className="mr-2 h-4 w-4" />
-                        View Documentation
-                      </Button>
-                      <Button
-                        className="w-full justify-start"
-                        variant="outline"
-                        onClick={() => setActiveTab("sandbox")}
-                      >
-                        <Terminal className="mr-2 h-4 w-4" />
-                        Try Sandbox
-                      </Button>
-                      <Button
-                        className="w-full justify-start"
-                        variant="outline"
-                        onClick={() => setActiveTab("analytics")}
-                      >
-                        <BarChart3 className="mr-2 h-4 w-4" />
-                        View Analytics
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Getting Started */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Getting Started</CardTitle>
-                    <CardDescription>
-                      Quick guide to using our AI Platform
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="rounded-lg bg-muted p-4">
-                        <h3 className="mb-2 font-medium">1. Generate an API Key</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Create an API key to authenticate your requests to our
-                          services.
-                        </p>
-                      </div>
-                      <div className="rounded-lg bg-muted p-4">
-                        <h3 className="mb-2 font-medium">
-                          2. Explore the Documentation
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          Learn how to use our APIs with comprehensive guides and
-                          examples.
-                        </p>
-                      </div>
-                      <div className="rounded-lg bg-muted p-4">
-                        <h3 className="mb-2 font-medium">3. Test in the Sandbox</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Try out API calls in our interactive sandbox before
-                          implementing them in your code.
-                        </p>
-                      </div>
-                      <div className="rounded-lg bg-muted p-4">
-                        <h3 className="mb-2 font-medium">4. Monitor Your Usage</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Keep track of your API usage and performance in the
-                          Analytics dashboard.
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+              <TabsContent value="builder">
+                <ExperienceBuilder onExperienceSaved={() => setActiveTab("overview")} />
               </TabsContent>
 
               <TabsContent value="rag">
                 <RagEngine />
-              </TabsContent>
-
-              <TabsContent value="summarization">
-                <Summarization />
-              </TabsContent>
-
-              <TabsContent value="translation">
-                <Translation />
-              </TabsContent>
-
-              <TabsContent value="tts">
-                <TextToSpeech />
-              </TabsContent>
-
-              <TabsContent value="documentation">
-                <Card className="bg-card">
-                  <CardHeader>
-                    <CardTitle>API Documentation</CardTitle>
-                    <CardDescription>
-                      Comprehensive guides for all our AI services
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="mb-4">
-                      Select a service to view its documentation:
-                    </p>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                      <Card className="cursor-pointer hover:bg-accent/50">
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-lg">RAG</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-sm text-muted-foreground">
-                            Retrieval-Augmented Generation API documentation
-                          </p>
-                        </CardContent>
-                      </Card>
-                      <Card className="cursor-pointer hover:bg-accent/50">
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-lg">Summarization</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-sm text-muted-foreground">
-                            Text summarization API documentation
-                          </p>
-                        </CardContent>
-                      </Card>
-                      <Card className="cursor-pointer hover:bg-accent/50">
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-lg">Translation</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-sm text-muted-foreground">
-                            Language translation API documentation
-                          </p>
-                        </CardContent>
-                      </Card>
-                      <Card className="cursor-pointer hover:bg-accent/50">
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-lg">TTS</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-sm text-muted-foreground">
-                            Text-to-Speech API documentation
-                          </p>
-                        </CardContent>
-                      </Card>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="apikeys">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>API Keys</CardTitle>
-                    <CardDescription>
-                      Manage your API keys and access tokens
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Link to="/api-key-manager" className="w-full block">
-                      <Button className="w-full">
-                        <Key className="mr-2 h-4 w-4" />
-                        Go to API Key Manager
-                      </Button>
-                    </Link>
-                    <div className="mt-4">
-                      <Button variant="outline" className="w-full">
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Generate New API Key
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="analytics">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Analytics Dashboard</CardTitle>
-                    <CardDescription>
-                      Monitor your API usage and performance metrics
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Link to="/analytics-dashboard" className="w-full block">
-                      <Button className="w-full">
-                        <BarChart3 className="mr-2 h-4 w-4" />
-                        Go to Analytics Dashboard
-                      </Button>
-                    </Link>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="sandbox">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>API Sandbox</CardTitle>
-                    <CardDescription>
-                      Test our APIs in an interactive environment
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Link to="/api-sandbox" className="w-full block">
-                      <Button className="w-full">
-                        <Terminal className="mr-2 h-4 w-4" />
-                        Go to API Sandbox
-                      </Button>
-                    </Link>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="settings">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Account Settings</CardTitle>
-                    <CardDescription>
-                      Manage your account preferences and settings
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div>
-                        <h3 className="text-lg font-medium">Profile Information</h3>
-                        <Separator className="my-2" />
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                          <div>
-                            <label className="text-sm font-medium">Name</label>
-                            <p className="text-sm text-muted-foreground">
-                              {username}
-                            </p>
-                          </div>
-                          <div>
-                            <label className="text-sm font-medium">Email</label>
-                            <p className="text-sm text-muted-foreground">
-                              developer@example.com
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <h3 className="text-lg font-medium">Preferences</h3>
-                        <Separator className="my-2" />
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <label className="text-sm font-medium">
-                              Email Notifications
-                            </label>
-                            <Button variant="outline" size="sm">
-                              Configure
-                            </Button>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <label className="text-sm font-medium">
-                              API Usage Alerts
-                            </label>
-                            <Button variant="outline" size="sm">
-                              Configure
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <h3 className="text-lg font-medium">Billing</h3>
-                        <Separator className="my-2" />
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <label className="text-sm font-medium">
-                              Current Plan
-                            </label>
-                            <Badge>Developer</Badge>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <label className="text-sm font-medium">
-                              Billing Cycle
-                            </label>
-                            <p className="text-sm text-muted-foreground">Monthly</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
               </TabsContent>
 
               <TabsContent value="chat">
@@ -738,190 +311,74 @@ import { AlefChat } from '@alef/chat-widget';
                   <CardHeader>
                     <div className="flex justify-between items-center">
                       <div>
-                        <CardTitle>Chat</CardTitle>
+                        <CardTitle>Chat Preview</CardTitle>
                         <CardDescription>
-                          Interact with our AI assistant
+                          Test an AI Experience configuration.
                         </CardDescription>
                       </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant={activeSection === "chat" ? "default" : "outline"}
-                          onClick={() => setActiveSection("chat")}
-                        >
-                          <MessageSquare className="h-4 w-4 mr-2" />
-                          Chat
-                        </Button>
-                        <Button
-                          variant={activeSection === "customize" ? "default" : "outline"}
-                          onClick={() => setActiveSection("customize")}
-                        >
-                          <Paintbrush className="h-4 w-4 mr-2" />
-                          Customize
-                        </Button>
-                        <Button
-                          variant={activeSection === "embed" ? "default" : "outline"}
-                          onClick={() => setActiveSection("embed")}
-                        >
-                          <Code className="h-4 w-4 mr-2" />
-                          Embed
-                        </Button>
+                      <div className="w-64">
+                        <Select onValueChange={loadConfigForChat} defaultValue={chatPreviewConfig.configId}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Load Config to Preview..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {savedConfigs.map(sc => (
+                              <SelectItem key={sc.configId} value={sc.configId!}>{sc.configName}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    {activeSection === "chat" && (
-                      <div className="flex flex-col h-[600px]">
-                        <div className="flex-1 overflow-y-auto mb-4 space-y-4 p-4 border rounded-lg">
-                          {messages.map((message, index) => (
-                            <div
-                              key={index}
-                              className={`flex ${message.role === "user" ? "justify-end" : "justify-start"
-                                }`}
-                            >
-                              <div
-                                className={`max-w-[80%] rounded-lg px-4 py-2 ${message.role === "user"
-                                    ? "bg-primary text-primary-foreground"
-                                    : "bg-muted"
-                                  }`}
-                              >
-                                <p>{message.content}</p>
-                                <p className="text-xs opacity-70 mt-1">
-                                  {new Date(message.timestamp).toLocaleTimeString()}
-                                </p>
-                              </div>
+                    <div className="flex flex-col h-[600px]">
+                      <div className="flex-1 overflow-y-auto mb-4 space-y-4 p-4 border rounded-lg bg-muted/30">
+                        {messages.map((message, index) => (
+                          <div key={index} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+                            <div className={`max-w-[80%] rounded-lg px-4 py-2 ${message.role === "user" ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}>
+                              <p className="text-sm">{message.content}</p>
+                              <p className="text-xs opacity-70 mt-1 text-right">{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                             </div>
-                          ))}
-                        </div>
-                        <div className="flex gap-2 p-4 border-t">
-                          <Input
-                            value={inputMessage}
-                            onChange={(e) => setInputMessage(e.target.value)}
-                            placeholder="Type your message..."
-                            onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
-                            className="flex-1"
-                          />
-                          <Button onClick={handleSendMessage}>
-                            <Send className="h-4 w-4 mr-2" />
-                            Send
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-
-                    {activeSection === "customize" && (
-                      <div className="space-y-6">
-                        <div className="space-y-2">
-                          <Label>Theme</Label>
-                          <Select
-                            value={chatConfig.theme}
-                            onValueChange={(value: "light" | "dark" | "system") =>
-                              setChatConfig({ ...chatConfig, theme: value })
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select theme" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="light">Light</SelectItem>
-                              <SelectItem value="dark">Dark</SelectItem>
-                              <SelectItem value="system">System</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <Label>Enable RAG Integration</Label>
-                          <Switch
-                            checked={chatConfig.ragEnabled}
-                            onCheckedChange={(checked) =>
-                              setChatConfig({ ...chatConfig, ragEnabled: checked })
-                            }
-                          />
-                        </div>
-
-                        {chatConfig.ragEnabled && (
-                          <div className="space-y-2">
-                            <Label>Select Knowledge Base</Label>
-                            <Select
-                              value={chatConfig.selectedKnowledge}
-                              onValueChange={(value) =>
-                                setChatConfig({ ...chatConfig, selectedKnowledge: value })
-                              }
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select knowledge base" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {knowledgeBases.map((kb) => (
-                                  <SelectItem key={kb.id} value={kb.id}>
-                                    {kb.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
                           </div>
+                        ))}
+                        {messages.length === 0 && (
+                          <div className="text-center text-muted-foreground pt-10">Load a configuration and start chatting...</div>
                         )}
-
-                        <div className="space-y-2">
-                          <Label>Custom CSS</Label>
-                          <Textarea
-                            value={chatConfig.customStyles}
-                            onChange={(e) =>
-                              setChatConfig({ ...chatConfig, customStyles: e.target.value })
-                            }
-                            placeholder=".chat-widget { /* your custom styles */ }"
-                            className="font-mono"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>API Key</Label>
-                          <Input
-                            type="password"
-                            value={chatConfig.apiKey}
-                            onChange={(e) =>
-                              setChatConfig({ ...chatConfig, apiKey: e.target.value })
-                            }
-                            placeholder="Enter your API key"
-                          />
-                        </div>
                       </div>
-                    )}
-
-                    {activeSection === "embed" && (
-                      <div className="space-y-4">
-                        <div className="relative">
-                          <pre className="p-4 rounded-lg bg-muted overflow-x-auto">
-                            <code>{generateEmbedCode()}</code>
-                          </pre>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="absolute top-2 right-2"
-                            onClick={() => {
-                              navigator.clipboard.writeText(generateEmbedCode());
-                              toast({
-                                title: "Copied!",
-                                description: "Code copied to clipboard",
-                              });
-                            }}
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <div className="space-y-2">
-                          <h3 className="font-medium">Integration Steps:</h3>
-                          <ol className="list-decimal list-inside space-y-2">
-                            <li>Install the chat widget package using npm or yarn</li>
-                            <li>Import the AlefChat component into your application</li>
-                            <li>Add your API key and desired configuration</li>
-                            <li>Place the component wherever you want the chat widget to appear</li>
-                          </ol>
-                        </div>
+                      <div className="flex gap-2 p-4 border-t">
+                        {chatPreviewConfig.capabilities.voice?.enabled && (
+                          <Button variant="outline" size="icon" className="shrink-0" title="Voice Input (Mock)"><Mic className="h-4 w-4" /></Button>
+                        )}
+                        <Input
+                          value={inputMessage}
+                          onChange={(e) => setInputMessage(e.target.value)}
+                          placeholder={`Ask something (using ${chatPreviewConfig.configName})...`}
+                          onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
+                          className="flex-1"
+                        />
+                        <Button onClick={handleSendMessage} disabled={!inputMessage.trim()}>
+                          <Send className="h-4 w-4 mr-2" />Send
+                        </Button>
                       </div>
-                    )}
+                    </div>
                   </CardContent>
                 </Card>
+              </TabsContent>
+
+              <TabsContent value="documentation">
+                <Card><CardHeader><CardTitle>Documentation</CardTitle></CardHeader><CardContent><p>Platform documentation and API guides will be here.</p></CardContent></Card>
+              </TabsContent>
+
+              <TabsContent value="apikeys">
+                <Card><CardHeader><CardTitle>API Keys</CardTitle></CardHeader><CardContent><p>Manage your API keys here.</p></CardContent></Card>
+              </TabsContent>
+
+              <TabsContent value="analytics">
+                <Card><CardHeader><CardTitle>Analytics</CardTitle></CardHeader><CardContent><p>Usage and performance analytics will be displayed here.</p></CardContent></Card>
+              </TabsContent>
+
+              <TabsContent value="settings">
+                <Card><CardHeader><CardTitle>Settings</CardTitle></CardHeader><CardContent><p>Account and platform settings will be configurable here.</p></CardContent></Card>
               </TabsContent>
             </Tabs>
           </div>
@@ -929,6 +386,40 @@ import { AlefChat } from '@alef/chat-widget';
       </div>
     </div>
   );
+};
+
+interface NavButtonProps {
+  icon: React.ElementType;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  sidebarOpen: boolean;
+}
+
+const NavButton: React.FC<NavButtonProps> = ({ icon: Icon, label, active, onClick, sidebarOpen }) => {
+  return (
+    <Button
+      variant={active ? "secondary" : "ghost"}
+      className={`w-full ${sidebarOpen ? 'justify-start' : 'justify-center'} h-10`}
+      onClick={onClick}
+      title={label}
+    >
+      <Icon className={`h-5 w-5 ${sidebarOpen ? 'mr-3' : ''}`} />
+      {sidebarOpen && <span className="text-sm font-medium">{label}</span>}
+    </Button>
+  );
+}
+
+// Need to add colors definition if not already present globally
+const colors = {
+  primary: '#5680E9',
+  lightBlue: '#84CEEB',
+  mediumBlue: '#5AB9EA',
+  lightLavender: '#C1C8E4',
+  purple: '#8860D0',
+  textLight: '#FFFFFF',
+  textDark: '#2D3748',
+  border: '#E2E8F0',
 };
 
 export default Dashboard;
