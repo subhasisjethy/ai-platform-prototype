@@ -45,28 +45,11 @@ import {
     DialogFooter,
     DialogClose
 } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
-// --- Color Palette ---
-const colors = {
-    primary: '#5680E9',
-    lightBlue: '#84CEEB',
-    mediumBlue: '#5AB9EA',
-    lightLavender: '#C1C8E4',
-    purple: '#8860D0',
-    textLight: '#FFFFFF', // For dark backgrounds
-    textDark: '#2D3748', // For light backgrounds
-    border: '#E2E8F0', // Light border
-};
+// --- Removed Color Palette ---
 
-// --- Helper Function to get Icon --- (Keep as is)
-const getContentTypeIcon = (type: ContentType) => {
-    switch (type) {
-        case 'video': return <Video className="h-8 w-8" style={{ color: colors.mediumBlue }} />;
-        case 'book': return <BookText className="h-8 w-8" style={{ color: colors.mediumBlue }} />;
-        case 'assessment': return <ClipboardCheck className="h-8 w-8" style={{ color: colors.mediumBlue }} />;
-        default: return null;
-    }
-}
+// --- Removed Helper Function to get Icon ---
 
 const STEPS = [
     { id: 1, name: 'Context', description: 'Provide context about the AI experience.' },
@@ -85,7 +68,7 @@ const defaultAIConfig: AIExperienceConfig = {
     targetUser: '',
     capabilities: {
         ...baseDefaultAIConfig.capabilities,
-        aiTutor: baseDefaultAIConfig.capabilities.aiTutor || { enabled: false, persona: 'guide', proactiveEngagement: false },
+        aiTutor: baseDefaultAIConfig.capabilities.aiTutor || { enabled: false, persona: 'mentor', proactiveEngagement: false, isSpecialized: false, specializedSubject: null },
         personalizedRecommendation: baseDefaultAIConfig.capabilities.personalizedRecommendation || { enabled: false },
         learningAnalytics: baseDefaultAIConfig.capabilities.learningAnalytics || { enabled: false },
         feedbackGenerator: baseDefaultAIConfig.capabilities.feedbackGenerator || { enabled: false },
@@ -105,11 +88,15 @@ interface ExperienceBuilderProps {
     onExperienceSaved?: () => void; // Added prop for navigation callback
 }
 
+// Helper function to safely get nested values
+const getNestedValue = (obj: any, path: string, defaultValue: any = undefined) => {
+    return path.split('.').reduce((o, k) => (o && o[k] !== undefined ? o[k] : defaultValue), obj);
+};
+
 const ExperienceBuilder: React.FC<ExperienceBuilderProps> = ({ onExperienceSaved }) => {
     const [config, setConfig] = useState<AIExperienceConfig>(defaultAIConfig);
     const [currentStep, setCurrentStep] = useState(1);
     const [configName, setConfigName] = useState(config.configName || 'New Experience');
-    const [isTutorConfigOpen, setIsTutorConfigOpen] = useState(false);
     const [dialogOpenState, setDialogOpenState] = useState<Record<string, boolean>>({});
 
     // --- Memoize selected content for preview --- (Keep as is)
@@ -127,7 +114,10 @@ const ExperienceBuilder: React.FC<ExperienceBuilderProps> = ({ onExperienceSaved
             let current: any = { ...prevConfig };
             let ref = current;
             for (let i = 0; i < keys.length - 1; i++) {
-                if (ref[keys[i]] === undefined || ref[keys[i]] === null) ref[keys[i]] = {};
+                // Ensure intermediate objects exist
+                if (ref[keys[i]] === undefined || ref[keys[i]] === null || typeof ref[keys[i]] !== 'object') {
+                     ref[keys[i]] = {};
+                 }
                 ref = ref[keys[i]];
             }
             ref[keys[keys.length - 1]] = value;
@@ -156,7 +146,7 @@ import { ContentAIWidget } from '@alef/ai-platform';
         toast({
             title: "Configuration Saved",
             description: `Experience "${newConfig.configName}" saved.`,
-            action: <CheckCircle className="h-5 w-5" style={{ color: colors.mediumBlue }} />,
+            action: <CheckCircle className="h-5 w-5 text-foreground" />,
         });
         const existingIndex = savedConfigs.findIndex(c => c.configId === newConfig.configId);
         if (existingIndex > -1) {
@@ -165,11 +155,11 @@ import { ContentAIWidget } from '@alef/ai-platform';
             savedConfigs.push(newConfig);
         }
 
-        // --- NEW: Call the navigation callback --- 
+        // --- NEW: Call the navigation callback ---
         if (onExperienceSaved) {
             onExperienceSaved();
         }
-        // --- End NEW --- 
+        // --- End NEW ---
     };
 
     // --- Load Config --- (Keep as is, used outside stepper for now)
@@ -183,7 +173,7 @@ import { ContentAIWidget } from '@alef/ai-platform';
         }
     }
 
-    // --- Step Navigation --- 
+    // --- Step Navigation ---
     const handleNextStep = () => {
         if (currentStep < STEPS.length) {
             setCurrentStep(currentStep + 1);
@@ -212,56 +202,54 @@ import { ContentAIWidget } from '@alef/ai-platform';
         setDialogOpenState(prev => ({ ...prev, [dialog]: open }));
     };
 
+    // --- Refactored Stepper Component (Inline for simplicity) ---
+    const Stepper = () => (
+        <ol className="flex items-center w-full text-sm font-medium text-center text-muted-foreground pb-2 flex-wrap">
+            {STEPS.map((step, index) => (
+                <li
+                    key={step.id}
+                    className={cn(
+                        "flex items-center mb-2",
+                        step.id < STEPS.length ? "sm:after:content-[''] sm:after:w-full sm:after:h-px sm:after:bg-border sm:after:mx-4 flex-1" : ""
+                    )}
+                >
+                    <span
+                        className={cn(
+                            "flex items-center transition-colors",
+                            step.id < currentStep ? "cursor-pointer text-foreground hover:text-foreground/80" : "",
+                            step.id === currentStep ? "text-foreground" : ""
+                        )}
+                        onClick={() => step.id < currentStep && setCurrentStep(step.id)}
+                    >
+                        {step.id < currentStep ? (
+                            <CheckCircle className="w-5 h-5 mr-2 shrink-0 text-foreground" />
+                        ) : (
+                            <span
+                                className={cn(
+                                    "w-6 h-6 flex items-center justify-center rounded-full mr-2 shrink-0 border-2",
+                                    step.id === currentStep ? "border-foreground bg-accent text-accent-foreground" : "border-border"
+                                )}
+                            >
+                                {step.id}
+                            </span>
+                        )}
+                        <span className="md:inline font-medium ml-1">{step.name}</span>
+                    </span>
+                </li>
+            ))}
+        </ol>
+    );
+
     return (
-        <Card className="w-full h-full min-h-screen shadow-lg" style={{ background: `linear-gradient(to bottom, ${colors.lightLavender} 0%, ${colors.lightBlue} 100%)` }}>
-            <CardHeader className="border-b sticky top-0 z-10 backdrop-blur supports-[backdrop-filter]:bg-white/80" style={{ borderColor: colors.lightLavender }}>
+        <Card className="w-full h-full min-h-screen shadow-lg border-none bg-background">
+            <CardHeader className="border-b sticky top-0 z-10 backdrop-blur bg-background/80">
                 <div className="flex flex-col md:flex-row justify-between md:items-start gap-4">
                     <div className="flex-1 min-w-0">
-                        {/* Stepper Progress Indicator - Ensure no overflow and wrapping */}
-                        <ol className="flex items-center w-full text-sm font-medium text-center pb-2 flex-wrap" style={{ color: colors.textDark + 'aa' }}>
-                            {STEPS.map((step) => (
-                                <li key={step.id}
-                                    className={`flex items-center mb-2 mr-4 md:mr-0 ${
-                                        // Use flex-basis for better wrapping control on smaller screens if needed
-                                        // Removed complex after: logic for simplicity, relying on flex-wrap
-                                        step.id < STEPS.length ? `sm:after:content-[''] sm:after:w-full sm:after:h-1 sm:after:border-b sm:after:mx-4` : ""
-                                        }`}
-                                    style={{ borderColor: step.id < currentStep ? colors.primary : colors.lightLavender }}
-                                >
-                                    {/* Span has no whitespace-nowrap */}
-                                    <span
-                                        className={`flex items-center transition-colors ${step.id < currentStep ? 'cursor-pointer' : ''
-                                            }`}
-                                        style={{
-                                            color: step.id <= currentStep ? colors.primary : colors.textDark + 'aa',
-                                        }}
-                                        onMouseEnter={(e) => { if (step.id < currentStep) e.currentTarget.style.color = colors.primary + 'cc'; }}
-                                        onMouseLeave={(e) => { if (step.id < currentStep) e.currentTarget.style.color = colors.primary; }}
-                                        onClick={() => step.id < currentStep && setCurrentStep(step.id)}
-                                    >
-                                        {step.id < currentStep ? (
-                                            <CheckCircle className="w-5 h-5 mr-2 shrink-0" style={{ color: colors.primary }} />
-                                        ) : (
-                                            <span
-                                                className={`w-6 h-6 flex items-center justify-center rounded-full mr-2 shrink-0 transition-all border-2`}
-                                                style={{
-                                                    borderColor: step.id === currentStep ? colors.primary : colors.lightLavender,
-                                                    backgroundColor: step.id === currentStep ? colors.primary + '1a' : 'transparent',
-                                                    color: step.id === currentStep ? colors.primary : colors.textDark + 'aa'
-                                                }}
-                                            >
-                                                {step.id}
-                                            </span>
-                                        )}
-                                        <span className="md:inline font-medium ml-1">{step.name}</span> {/* Adjusted spacing */}
-                                    </span>
-                                </li>
-                            ))}
-                        </ol>
+                        <Stepper />
                         {/* Title and Description */}
                         <div className="mt-1">
-                            <h2 className="text-2xl font-semibold tracking-tight" style={{ color: colors.primary }}>{currentStepInfo?.name}</h2>
-                            <p className="text-sm" style={{ color: colors.textDark + 'cc' }}>{currentStepInfo?.description}</p>
+                            <h2 className="text-2xl font-semibold tracking-tight text-foreground">{currentStepInfo?.name}</h2>
+                            <p className="text-sm text-muted-foreground">{currentStepInfo?.description}</p>
                         </div>
                     </div>
                 </div>
@@ -270,45 +258,52 @@ import { ContentAIWidget } from '@alef/ai-platform';
                 <div className="min-h-[600px] space-y-6">
                     {currentStep === 1 && (
                         <div className="grid grid-cols-1 gap-6 h-full">
-                            <Card className="h-full shadow-md hover:shadow-lg transition-shadow border" style={{ backgroundColor: colors.textLight, borderColor: colors.border }}>
+                            <Card className="h-full shadow-md hover:shadow-lg transition-shadow">
                                 <CardHeader>
-                                    <CardTitle style={{ color: colors.textDark }}>Contextual Information</CardTitle>
-                                    <CardDescription style={{ color: colors.textDark + 'aa' }}>Describe the AI experience and its intended audience.</CardDescription>
+                                    <CardTitle>Contextual Information</CardTitle>
+                                    <CardDescription>Describe the AI experience and its intended audience.</CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-6">
                                     <div className="space-y-4">
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                            <SelectConfig
-                                                label="Product Line"
-                                                path="productLine"
-                                                config={config}
-                                                onChange={handleConfigChange}
-                                                options={[
-                                                    { value: 'core', label: 'Core Platform' },
-                                                    { value: 'pathways', label: 'Pathways' },
-                                                    { value: 'assessments', label: 'Assessments' },
-                                                    { value: 'abjadiyat', label: 'Abjadiyat' },
-                                                    { value: 'miqiyas', label: 'Miqiyas AL Dhad' }
-                                                ]}
-                                                placeholder="Select Product Line..."
-                                            />
-                                            <InputConfig
-                                                label="Product Name"
-                                                path="productName"
-                                                config={config}
-                                                onChange={handleConfigChange}
-                                                placeholder="Enter Product Name..."
-                                            />
+                                            <div className="space-y-2">
+                                                <Label htmlFor="productLine">Product Line</Label>
+                                                <Select value={config.productLine} onValueChange={(val) => handleConfigChange('productLine', val)}>
+                                                    <SelectTrigger id="productLine" className="w-full">
+                                                        <SelectValue placeholder="Select Product Line..." />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {[
+                                                            { value: 'core', label: 'Core Platform' },
+                                                            { value: 'pathways', label: 'Pathways' },
+                                                            { value: 'assessments', label: 'Assessments' },
+                                                            { value: 'abjadiyat', label: 'Abjadiyat' },
+                                                            { value: 'miqiyas', label: 'Miqiyas AL Dhad' },
+                                                            { value: 'senegal_adhoc', label: 'Senegal Adhoc' }
+                                                        ].map(opt => (
+                                                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="productName">Product Name</Label>
+                                                <Input
+                                                    id="productName"
+                                                    value={config.productName}
+                                                    onChange={(e) => handleConfigChange('productName', e.target.value)}
+                                                    placeholder="Enter Product Name..."
+                                                />
+                                            </div>
                                         </div>
                                         <div className="space-y-2">
                                             <div className="flex justify-between items-center mb-1">
-                                                <Label htmlFor="integrationContext" style={{ color: colors.textDark + 'dd' }}>Details</Label>
+                                                <Label htmlFor="integrationContext">Details</Label>
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
                                                     onClick={handleGenerateIntegrationContext}
-                                                    style={{ color: colors.purple, padding: '0.25rem 0.5rem' }}
-                                                    className="text-xs h-auto"
+                                                    className="text-foreground hover:text-foreground/80 text-xs h-auto px-2 py-1"
                                                 >
                                                     <Sparkles className="h-3 w-3 mr-1" />
                                                     AI Generate
@@ -320,18 +315,16 @@ import { ContentAIWidget } from '@alef/ai-platform';
                                                 onChange={(e) => handleConfigChange('integrationContext', e.target.value)}
                                                 placeholder="Briefly describe where and how this AI experience will be integrated..."
                                                 className="w-full transition-colors min-h-[80px]"
-                                                style={{ backgroundColor: colors.lightLavender + '40', borderColor: colors.lightLavender, color: colors.textDark }}
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor="targetUser" style={{ color: colors.textDark + 'dd' }}>Target User</Label>
+                                            <Label htmlFor="targetUser">Target User</Label>
                                             <Input
                                                 id="targetUser"
                                                 value={config.targetUser}
                                                 onChange={(e) => handleConfigChange('targetUser', e.target.value)}
                                                 placeholder="e.g., Grade 5 students, Teachers preparing lessons, Parents checking progress..."
                                                 className="w-full transition-colors"
-                                                style={{ backgroundColor: colors.lightLavender + '40', borderColor: colors.lightLavender, color: colors.textDark }}
                                             />
                                         </div>
                                     </div>
@@ -343,192 +336,402 @@ import { ContentAIWidget } from '@alef/ai-platform';
                     {currentStep === 2 && (
                         <ScrollArea className="h-[700px] w-full pr-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-                                <CapabilityCard title="AI Tutor" icon={<MessageSquare className="w-5 h-5" />}>
-                                    <SwitchConfig label="Enable AI Tutor" path="capabilities.aiTutor.enabled" config={config} onChange={handleConfigChange} />
-                                    {config.capabilities.aiTutor?.enabled && (
-                                        <Dialog open={dialogOpenState['aiTutor'] ?? false} onOpenChange={(open) => handleDialogOpenChange('aiTutor', open)}>
-                                            <DialogTrigger asChild>
-                                                <Button variant="outline" size="sm" className="w-full mt-2" style={{ backgroundColor: colors.lightLavender + '40', borderColor: colors.lightLavender, color: colors.textDark }}>
-                                                    Configure
-                                                </Button>
-                                            </DialogTrigger>
-                                            <DialogContent style={{ backgroundColor: colors.textLight, borderColor: colors.border }}>
-                                                <DialogHeader>
-                                                    <DialogTitle style={{ color: colors.textDark }}>AI Tutor Configuration</DialogTitle>
-                                                </DialogHeader>
-                                                <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
-                                                    <SelectConfig label="Tutor Persona" path="capabilities.aiTutor.persona" config={config} onChange={handleConfigChange} options={[{ value: 'guide', label: 'Guide' }, { value: 'mentor', label: 'Mentor' }, { value: 'expert', label: 'Expert' }]} />
-                                                    <SwitchConfig label="Proactive Engagement" path="capabilities.aiTutor.proactiveEngagement" config={config} onChange={handleConfigChange} />
-                                                    <div className="space-y-2">
-                                                        <Label htmlFor="aiTutorPrompt" style={{ color: colors.textDark + 'dd' }}>Prompt</Label>
-                                                        <Textarea
-                                                            id="aiTutorPrompt"
-                                                            value={config.capabilities.aiTutor?.prompt || ''}
-                                                            onChange={(e) => handleConfigChange('capabilities.aiTutor.prompt', e.target.value)}
-                                                            placeholder="Enter custom prompt or use default..."
-                                                            className="w-full transition-colors min-h-[100px]"
-                                                            style={{ backgroundColor: colors.lightLavender + '40', borderColor: colors.lightLavender, color: colors.textDark }}
-                                                        />
+                                <Card className="h-full shadow-md hover:shadow-lg transition-all">
+                                    <CardHeader className="pb-4">
+                                        <CardTitle className="text-base font-semibold flex items-center gap-2">
+                                            <span className="text-foreground"><MessageSquare className="w-5 h-5" /></span> AI Tutor
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <div className="flex items-center justify-between space-x-4 py-1">
+                                            <Label htmlFor="capabilities.aiTutor.enabled" className="text-sm flex-1">Enable AI Tutor</Label>
+                                            <Switch
+                                                id="capabilities.aiTutor.enabled"
+                                                checked={getNestedValue(config, 'capabilities.aiTutor.enabled', false)}
+                                                onCheckedChange={(checked) => handleConfigChange('capabilities.aiTutor.enabled', checked)}
+                                            />
+                                        </div>
+                                        <p className="text-xs text-muted-foreground pt-1">Provides interactive guidance and answers student questions.</p>
+                                        {getNestedValue(config, 'capabilities.aiTutor.enabled') && (
+                                            <Dialog open={dialogOpenState['aiTutor'] ?? false} onOpenChange={(open) => handleDialogOpenChange('aiTutor', open)}>
+                                                <DialogTrigger asChild>
+                                                    <Button variant="outline" size="sm" className="w-full mt-2">
+                                                        Configure
+                                                    </Button>
+                                                </DialogTrigger>
+                                                <DialogContent>
+                                                    <DialogHeader>
+                                                        <DialogTitle>AI Tutor Configuration</DialogTitle>
+                                                    </DialogHeader>
+                                                    <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
+                                                        <div className="space-y-2">
+                                                            <Label htmlFor="capabilities.aiTutor.persona">Tutor Persona</Label>
+                                                            <Select value={getNestedValue(config, 'capabilities.aiTutor.persona')} onValueChange={(val) => handleConfigChange('capabilities.aiTutor.persona', val)}>
+                                                                <SelectTrigger id="capabilities.aiTutor.persona" className="w-full">
+                                                                    <SelectValue placeholder="Select Persona..." />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    {[
+                                                                        { value: 'mentor', label: 'Mentor' },
+                                                                        { value: 'teacher', label: 'Teacher' },
+                                                                        { value: 'peer', label: 'Peer' },
+                                                                        { value: 'smart', label: 'Smart (dynamic)' }
+                                                                    ].map(opt => (
+                                                                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                                                    ))}
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </div>
+                                                        <div className="flex items-center justify-between space-x-4 py-1">
+                                                            <Label htmlFor="capabilities.aiTutor.proactiveEngagement" className="text-sm flex-1">Proactive Engagement</Label>
+                                                            <Switch
+                                                                id="capabilities.aiTutor.proactiveEngagement"
+                                                                checked={getNestedValue(config, 'capabilities.aiTutor.proactiveEngagement', false)}
+                                                                onCheckedChange={(checked) => handleConfigChange('capabilities.aiTutor.proactiveEngagement', checked)}
+                                                            />
+                                                        </div>
+                                                        <div className="flex items-center justify-between space-x-4 py-1">
+                                                            <Label htmlFor="capabilities.aiTutor.isSpecialized" className="text-sm flex-1">Specialized Tutor</Label>
+                                                            <Switch
+                                                                id="capabilities.aiTutor.isSpecialized"
+                                                                checked={getNestedValue(config, 'capabilities.aiTutor.isSpecialized', false)}
+                                                                onCheckedChange={(checked) => {
+                                                                    handleConfigChange('capabilities.aiTutor.isSpecialized', checked);
+                                                                    if (!checked) {
+                                                                        handleConfigChange('capabilities.aiTutor.specializedSubject', null);
+                                                                    }
+                                                                }}
+                                                            />
+                                                        </div>
+                                                        {getNestedValue(config, 'capabilities.aiTutor.isSpecialized') && (
+                                                            <div className="space-y-2 pt-2 pl-4 border-l-2">
+                                                                <Label htmlFor="capabilities.aiTutor.specializedSubject">Subject</Label>
+                                                                <Select value={getNestedValue(config, 'capabilities.aiTutor.specializedSubject')} onValueChange={(val) => handleConfigChange('capabilities.aiTutor.specializedSubject', val)}>
+                                                                    <SelectTrigger id="capabilities.aiTutor.specializedSubject" className="w-full">
+                                                                        <SelectValue placeholder="Select Subject..." />
+                                                                    </SelectTrigger>
+                                                                    <SelectContent>
+                                                                        {[
+                                                                            { value: 'math_en', label: 'Math (English)' },
+                                                                            { value: 'math_ar', label: 'Math (Arabic)' },
+                                                                            { value: 'en', label: 'English' },
+                                                                            { value: 'sci', label: 'Science' },
+                                                                            { value: 'ar', label: 'Arabic' },
+                                                                        ].map(opt => (
+                                                                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                                                        ))}
+                                                                    </SelectContent>
+                                                                </Select>
+                                                            </div>
+                                                        )}
+                                                        <div className="space-y-2 pt-4 border-t">
+                                                            <Label htmlFor="aiTutorPrompt">What is my Role?</Label>
+                                                            <Textarea
+                                                                id="aiTutorPrompt"
+                                                                value={getNestedValue(config, 'capabilities.aiTutor.prompt', '')}
+                                                                onChange={(e) => handleConfigChange('capabilities.aiTutor.prompt', e.target.value)}
+                                                                placeholder="Give a detailed explanation of the AI Tutor's role and what is it supposed to help the user with! e.g: help students undertand specific concept or questiions they are struggeling with."
+                                                                className="w-full transition-colors min-h-[100px]"
+                                                            />
+                                                        </div>
                                                     </div>
-                                                </div>
-                                                <DialogFooter>
-                                                    <DialogClose asChild><Button type="button" variant="outline" style={{ backgroundColor: colors.lightLavender + '80', borderColor: colors.lightLavender, color: colors.textDark }}>Close</Button></DialogClose>
-                                                </DialogFooter>
-                                            </DialogContent>
-                                        </Dialog>
-                                    )}
-                                </CapabilityCard>
-                                <CapabilityCard title="Question Generator" icon={<FileQuestion className="w-5 h-5" />}>
-                                    <SwitchConfig label="Enable Question Gen." path="capabilities.questionGenerator.enabled" config={config} onChange={handleConfigChange} />
-                                    {config.capabilities.questionGenerator?.enabled && (
-                                        <Dialog open={dialogOpenState['questionGenerator'] ?? false} onOpenChange={(open) => handleDialogOpenChange('questionGenerator', open)}>
-                                            <DialogTrigger asChild>
-                                                <Button variant="outline" size="sm" className="w-full mt-2" style={{ backgroundColor: colors.lightLavender + '40', borderColor: colors.lightLavender, color: colors.textDark }}>
-                                                    Configure
-                                                </Button>
-                                            </DialogTrigger>
-                                            <DialogContent style={{ backgroundColor: colors.textLight, borderColor: colors.border }}>
-                                                <DialogHeader><DialogTitle style={{ color: colors.textDark }}>Question Generator Configuration</DialogTitle></DialogHeader>
-                                                <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
-                                                    <div className="text-sm text-muted-foreground italic">No specific options currently available.</div>
-                                                    <div className="space-y-2 pt-4 border-t" style={{ borderColor: colors.lightLavender + '80' }}>
-                                                        <Label htmlFor="qgPrompt" style={{ color: colors.textDark + 'dd' }}>Prompt</Label>
-                                                        <Textarea
-                                                            id="qgPrompt"
-                                                            value={config.capabilities.questionGenerator?.prompt || ''}
-                                                            onChange={(e) => handleConfigChange('capabilities.questionGenerator.prompt', e.target.value)}
-                                                            placeholder="Enter custom prompt or use default..."
-                                                            className="w-full transition-colors min-h-[100px]"
-                                                            style={{ backgroundColor: colors.lightLavender + '40', borderColor: colors.lightLavender, color: colors.textDark }}
-                                                        />
+                                                    <DialogFooter>
+                                                        <DialogClose asChild><Button type="button" variant="outline">Close</Button></DialogClose>
+                                                    </DialogFooter>
+                                                </DialogContent>
+                                            </Dialog>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                                <Card className="h-full shadow-md hover:shadow-lg transition-all">
+                                    <CardHeader className="pb-4">
+                                        <CardTitle className="text-base font-semibold flex items-center gap-2">
+                                            <span className="text-foreground"><FileQuestion className="w-5 h-5" /></span> Question Generator
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <div className="flex items-center justify-between space-x-4 py-1">
+                                            <Label htmlFor="capabilities.questionGenerator.enabled" className="text-sm flex-1">Enable Question Gen.</Label>
+                                            <Switch
+                                                id="capabilities.questionGenerator.enabled"
+                                                checked={getNestedValue(config, 'capabilities.questionGenerator.enabled', false)}
+                                                onCheckedChange={(checked) => handleConfigChange('capabilities.questionGenerator.enabled', checked)}
+                                            />
+                                        </div>
+                                        <p className="text-xs text-muted-foreground pt-1">Automatically creates questions based on the content context.</p>
+                                        {getNestedValue(config, 'capabilities.questionGenerator.enabled') && (
+                                            <Dialog open={dialogOpenState['questionGenerator'] ?? false} onOpenChange={(open) => handleDialogOpenChange('questionGenerator', open)}>
+                                                <DialogTrigger asChild>
+                                                    <Button variant="outline" size="sm" className="w-full mt-2">Configure</Button>
+                                                </DialogTrigger>
+                                                <DialogContent>
+                                                    <DialogHeader><DialogTitle>Question Generator Configuration</DialogTitle></DialogHeader>
+                                                    <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
+                                                        <div className="text-sm text-muted-foreground italic">No specific options currently available.</div>
+                                                        <div className="space-y-2 pt-4 border-t">
+                                                            <Label htmlFor="qgPrompt">Prompt</Label>
+                                                            <Textarea
+                                                                id="qgPrompt"
+                                                                value={getNestedValue(config, 'capabilities.questionGenerator.prompt', '')}
+                                                                onChange={(e) => handleConfigChange('capabilities.questionGenerator.prompt', e.target.value)}
+                                                                placeholder="Enter custom prompt or use default..."
+                                                                className="w-full transition-colors min-h-[100px]"
+                                                            />
+                                                        </div>
                                                     </div>
-                                                </div>
-                                                <DialogFooter>
-                                                    <DialogClose asChild><Button type="button" variant="outline" style={{ backgroundColor: colors.lightLavender + '80', borderColor: colors.lightLavender, color: colors.textDark }}>Close</Button></DialogClose>
-                                                </DialogFooter>
-                                            </DialogContent>
-                                        </Dialog>
-                                    )}
-                                </CapabilityCard>
+                                                    <DialogFooter>
+                                                        <DialogClose asChild><Button type="button" variant="outline">Close</Button></DialogClose>
+                                                    </DialogFooter>
+                                                </DialogContent>
+                                            </Dialog>
+                                        )}
+                                    </CardContent>
+                                </Card>
                             </div>
 
                             <div className="mb-6">
-                                <h3 className="text-lg font-medium mb-3 pl-1" style={{ color: colors.textDark }}>Helpers</h3>
+                                <h3 className="text-lg font-medium mb-3 pl-1">Helpers</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    <CapabilityCard title="Simplification" icon={<Sparkles className="w-5 h-5" />}>
-                                        <SwitchConfig label="Enable Simplifier" path="capabilities.simplifier.enabled" config={config} onChange={handleConfigChange} />
-                                        {config.capabilities.simplifier?.enabled && (
-                                            <Dialog open={dialogOpenState['simplifier'] ?? false} onOpenChange={(open) => handleDialogOpenChange('simplifier', open)}>
-                                                <DialogTrigger asChild>
-                                                    <Button variant="outline" size="sm" className="w-full mt-2" style={{ backgroundColor: colors.lightLavender + '40', borderColor: colors.lightLavender, color: colors.textDark }}>Configure</Button>
-                                                </DialogTrigger>
-                                                <DialogContent style={{ backgroundColor: colors.textLight, borderColor: colors.border }}>
-                                                    <DialogHeader><DialogTitle style={{ color: colors.textDark }}>Simplification Configuration</DialogTitle></DialogHeader>
-                                                    <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
-                                                        <InputConfig label="Target Grade Level" path="capabilities.simplifier.targetGradeLevel" type="number" config={config} onChange={handleConfigChange} />
-                                                        <div className="space-y-2 pt-4 border-t" style={{ borderColor: colors.lightLavender + '80' }}>
-                                                            <Label htmlFor="simplifierPrompt" style={{ color: colors.textDark + 'dd' }}>Prompt</Label>
-                                                            <Textarea
-                                                                id="simplifierPrompt"
-                                                                value={config.capabilities.simplifier?.prompt || ''}
-                                                                onChange={(e) => handleConfigChange('capabilities.simplifier.prompt', e.target.value)}
-                                                                placeholder="Enter custom prompt or use default..."
-                                                                className="w-full transition-colors min-h-[100px]"
-                                                                style={{ backgroundColor: colors.lightLavender + '40', borderColor: colors.lightLavender, color: colors.textDark }}
-                                                            />
+                                    <Card className="h-full shadow-md hover:shadow-lg transition-all">
+                                        <CardHeader className="pb-4">
+                                            <CardTitle className="text-base font-semibold flex items-center gap-2">
+                                                <span className="text-foreground"><Sparkles className="w-5 h-5" /></span> Simplification
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-4">
+                                            <div className="flex items-center justify-between space-x-4 py-1">
+                                                <Label htmlFor="capabilities.simplifier.enabled" className="text-sm flex-1">Enable Simplifier</Label>
+                                                <Switch
+                                                    id="capabilities.simplifier.enabled"
+                                                    checked={getNestedValue(config, 'capabilities.simplifier.enabled', false)}
+                                                    onCheckedChange={(checked) => handleConfigChange('capabilities.simplifier.enabled', checked)}
+                                                />
+                                            </div>
+                                            <p className="text-xs text-muted-foreground pt-1">Rewrites text to be easier to understand (e.g., for different grade levels).</p>
+                                            {getNestedValue(config, 'capabilities.simplifier.enabled') && (
+                                                <Dialog open={dialogOpenState['simplifier'] ?? false} onOpenChange={(open) => handleDialogOpenChange('simplifier', open)}>
+                                                    <DialogTrigger asChild>
+                                                        <Button variant="outline" size="sm" className="w-full mt-2">Configure</Button>
+                                                    </DialogTrigger>
+                                                    <DialogContent>
+                                                        <DialogHeader><DialogTitle>Simplification Configuration</DialogTitle></DialogHeader>
+                                                        <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
+                                                            <div className="space-y-2 pt-4 border-t">
+                                                                <Label htmlFor="simplifierPrompt">What's my Role</Label>
+                                                                <Textarea
+                                                                    id="simplifierPrompt"
+                                                                    value={getNestedValue(config, 'capabilities.simplifier.prompt', '')}
+                                                                    onChange={(e) => handleConfigChange('capabilities.simplifier.prompt', e.target.value)}
+                                                                    placeholder="Tell me in details how do you want me to simplify the text in question"
+                                                                    className="w-full transition-colors min-h-[100px]"
+                                                                />
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                    <DialogFooter><DialogClose asChild><Button type="button" variant="outline" style={{ backgroundColor: colors.lightLavender + '80', borderColor: colors.lightLavender, color: colors.textDark }}>Close</Button></DialogClose></DialogFooter>
-                                                </DialogContent>
-                                            </Dialog>
-                                        )}
-                                    </CapabilityCard>
-                                    <CapabilityCard title="Translate" icon={<Languages className="w-5 h-5" />}>
-                                        <SwitchConfig label="Enable Translator" path="capabilities.translator.enabled" config={config} onChange={handleConfigChange} />
-                                        {config.capabilities.translator?.enabled && (
-                                            <Dialog open={dialogOpenState['translator'] ?? false} onOpenChange={(open) => handleDialogOpenChange('translator', open)}>
-                                                <DialogTrigger asChild>
-                                                    <Button variant="outline" size="sm" className="w-full mt-2" style={{ backgroundColor: colors.lightLavender + '40', borderColor: colors.lightLavender, color: colors.textDark }}>Configure</Button>
-                                                </DialogTrigger>
-                                                <DialogContent style={{ backgroundColor: colors.textLight, borderColor: colors.border }}>
-                                                    <DialogHeader><DialogTitle style={{ color: colors.textDark }}>Translate Configuration</DialogTitle></DialogHeader>
-                                                    <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
-                                                        <SelectConfig label="Target Language" path="capabilities.translator.targetLanguages.0" config={config} onChange={(p, v) => handleConfigChange('capabilities.translator.targetLanguages', [v])} options={[{ value: 'ar', label: 'Arabic' }, { value: 'en', label: 'English' }]} />
-                                                        <div className="space-y-2 pt-4 border-t" style={{ borderColor: colors.lightLavender + '80' }}>
-                                                            <Label htmlFor="translatorPrompt" style={{ color: colors.textDark + 'dd' }}>Prompt</Label>
-                                                            <Textarea
-                                                                id="translatorPrompt"
-                                                                value={config.capabilities.translator?.prompt || ''}
-                                                                onChange={(e) => handleConfigChange('capabilities.translator.prompt', e.target.value)}
-                                                                placeholder="Enter custom prompt or use default..."
-                                                                className="w-full transition-colors min-h-[100px]"
-                                                                style={{ backgroundColor: colors.lightLavender + '40', borderColor: colors.lightLavender, color: colors.textDark }}
-                                                            />
+                                                        <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Close</Button></DialogClose></DialogFooter>
+                                                    </DialogContent>
+                                                </Dialog>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+                                    <Card className="h-full shadow-md hover:shadow-lg transition-all">
+                                        <CardHeader className="pb-4">
+                                            <CardTitle className="text-foreground flex items-center gap-2">
+                                                <span className="text-foreground"><Languages className="w-5 h-5" /></span> Translate
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-4">
+                                            <div className="flex items-center justify-between space-x-4 py-1">
+                                                <Label htmlFor="capabilities.translator.enabled" className="text-sm flex-1">Enable Translator</Label>
+                                                <Switch
+                                                    id="capabilities.translator.enabled"
+                                                    checked={getNestedValue(config, 'capabilities.translator.enabled', false)}
+                                                    onCheckedChange={(checked) => handleConfigChange('capabilities.translator.enabled', checked)}
+                                                />
+                                            </div>
+                                            <p className="text-xs text-muted-foreground pt-1">Translates content between supported languages.</p>
+                                            {getNestedValue(config, 'capabilities.translator.enabled') && (
+                                                <Dialog open={dialogOpenState['translator'] ?? false} onOpenChange={(open) => handleDialogOpenChange('translator', open)}>
+                                                    <DialogTrigger asChild>
+                                                        <Button variant="outline" size="sm" className="w-full mt-2">Configure</Button>
+                                                    </DialogTrigger>
+                                                    <DialogContent>
+                                                        <DialogHeader><DialogTitle>Translate Configuration</DialogTitle></DialogHeader>
+                                                        <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
+                                                            <div className="space-y-2">
+                                                                <Label htmlFor="capabilities.translator.targetLanguages">Target Language</Label>
+                                                                <Select value={getNestedValue(config, 'capabilities.translator.targetLanguages.0')} onValueChange={(val) => handleConfigChange('capabilities.translator.targetLanguages', [val])}>
+                                                                    <SelectTrigger id="capabilities.translator.targetLanguages" className="w-full">
+                                                                        <SelectValue placeholder="Select Language..." />
+                                                                    </SelectTrigger>
+                                                                    <SelectContent>
+                                                                        {[{ value: 'ar', label: 'Arabic' }, { value: 'en', label: 'English' }].map(opt => (
+                                                                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                                                        ))}
+                                                                    </SelectContent>
+                                                                </Select>
+                                                            </div>
+                                                            <div className="space-y-2 pt-4 border-t">
+                                                                <Label htmlFor="translatorPrompt">Prompt</Label>
+                                                                <Textarea
+                                                                    id="translatorPrompt"
+                                                                    value={getNestedValue(config, 'capabilities.translator.prompt', '')}
+                                                                    onChange={(e) => handleConfigChange('capabilities.translator.prompt', e.target.value)}
+                                                                    placeholder="Enter custom prompt or use default..."
+                                                                    className="w-full transition-colors min-h-[100px]"
+                                                                />
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                    <DialogFooter><DialogClose asChild><Button type="button" variant="outline" style={{ backgroundColor: colors.lightLavender + '80', borderColor: colors.lightLavender, color: colors.textDark }}>Close</Button></DialogClose></DialogFooter>
-                                                </DialogContent>
-                                            </Dialog>
-                                        )}
-                                    </CapabilityCard>
-                                    <CapabilityCard title="Summarization" icon={<WrapText className="w-5 h-5" />}>
-                                        <SwitchConfig label="Enable Summarizer" path="capabilities.summarizer.enabled" config={config} onChange={handleConfigChange} />
-                                        {config.capabilities.summarizer?.enabled && (
-                                            <Dialog open={dialogOpenState['summarizer'] ?? false} onOpenChange={(open) => handleDialogOpenChange('summarizer', open)}>
-                                                <DialogTrigger asChild>
-                                                    <Button variant="outline" size="sm" className="w-full mt-2" style={{ backgroundColor: colors.lightLavender + '40', borderColor: colors.lightLavender, color: colors.textDark }}>Configure</Button>
-                                                </DialogTrigger>
-                                                <DialogContent style={{ backgroundColor: colors.textLight, borderColor: colors.border }}>
-                                                    <DialogHeader><DialogTitle style={{ color: colors.textDark }}>Summarization Configuration</DialogTitle></DialogHeader>
-                                                    <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
-                                                        <SelectConfig label="Format" path="capabilities.summarizer.format" config={config} onChange={handleConfigChange} options={[{ value: 'paragraph', label: 'Paragraph' }, { value: 'bullet_points', label: 'Bullet Points' }]} />
-                                                        <div className="space-y-2 pt-4 border-t" style={{ borderColor: colors.lightLavender + '80' }}>
-                                                            <Label htmlFor="summarizerPrompt" style={{ color: colors.textDark + 'dd' }}>Prompt</Label>
-                                                            <Textarea
-                                                                id="summarizerPrompt"
-                                                                value={config.capabilities.summarizer?.prompt || ''}
-                                                                onChange={(e) => handleConfigChange('capabilities.summarizer.prompt', e.target.value)}
-                                                                placeholder="Enter custom prompt or use default..."
-                                                                className="w-full transition-colors min-h-[100px]"
-                                                                style={{ backgroundColor: colors.lightLavender + '40', borderColor: colors.lightLavender, color: colors.textDark }}
-                                                            />
+                                                        <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Close</Button></DialogClose></DialogFooter>
+                                                    </DialogContent>
+                                                </Dialog>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+                                    <Card className="h-full shadow-md hover:shadow-lg transition-all">
+                                        <CardHeader className="pb-4">
+                                            <CardTitle className="text-foreground flex items-center gap-2">
+                                                <span className="text-foreground"><WrapText className="w-5 h-5" /></span> Summarization
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-4">
+                                            <div className="flex items-center justify-between space-x-4 py-1">
+                                                <Label htmlFor="capabilities.summarizer.enabled" className="text-sm flex-1">Enable Summarizer</Label>
+                                                <Switch
+                                                    id="capabilities.summarizer.enabled"
+                                                    checked={getNestedValue(config, 'capabilities.summarizer.enabled', false)}
+                                                    onCheckedChange={(checked) => handleConfigChange('capabilities.summarizer.enabled', checked)}
+                                                />
+                                            </div>
+                                            <p className="text-xs text-muted-foreground pt-1">Creates concise summaries of the provided content.</p>
+                                            {getNestedValue(config, 'capabilities.summarizer.enabled') && (
+                                                <Dialog open={dialogOpenState['summarizer'] ?? false} onOpenChange={(open) => handleDialogOpenChange('summarizer', open)}>
+                                                    <DialogTrigger asChild>
+                                                        <Button variant="outline" size="sm" className="w-full mt-2">Configure</Button>
+                                                    </DialogTrigger>
+                                                    <DialogContent>
+                                                        <DialogHeader><DialogTitle>Summarization Configuration</DialogTitle></DialogHeader>
+                                                        <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
+                                                            <div className="space-y-2">
+                                                                <Label htmlFor="capabilities.summarizer.format">Format</Label>
+                                                                <Select value={getNestedValue(config, 'capabilities.summarizer.format')} onValueChange={(val) => handleConfigChange('capabilities.summarizer.format', val)}>
+                                                                    <SelectTrigger id="capabilities.summarizer.format" className="w-full">
+                                                                        <SelectValue placeholder="Select Format..." />
+                                                                    </SelectTrigger>
+                                                                    <SelectContent>
+                                                                        {[{ value: 'paragraph', label: 'Paragraph' }, { value: 'bullet_points', label: 'Bullet Points' }].map(opt => (
+                                                                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                                                        ))}
+                                                                    </SelectContent>
+                                                                </Select>
+                                                            </div>
+                                                            <div className="space-y-2 pt-4 border-t">
+                                                                <Label htmlFor="summarizerPrompt">Prompt</Label>
+                                                                <Textarea
+                                                                    id="summarizerPrompt"
+                                                                    value={getNestedValue(config, 'capabilities.summarizer.prompt', '')}
+                                                                    onChange={(e) => handleConfigChange('capabilities.summarizer.prompt', e.target.value)}
+                                                                    placeholder="Enter custom prompt or use default..."
+                                                                    className="w-full transition-colors min-h-[100px]"
+                                                                />
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                    <DialogFooter><DialogClose asChild><Button type="button" variant="outline" style={{ backgroundColor: colors.lightLavender + '80', borderColor: colors.lightLavender, color: colors.textDark }}>Close</Button></DialogClose></DialogFooter>
-                                                </DialogContent>
-                                            </Dialog>
-                                        )}
-                                    </CapabilityCard>
+                                                        <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Close</Button></DialogClose></DialogFooter>
+                                                    </DialogContent>
+                                                </Dialog>
+                                            )}
+                                        </CardContent>
+                                    </Card>
                                 </div>
                             </div>
 
                             <div className="opacity-50 pointer-events-none">
-                                <h3 className="text-lg font-medium mb-3 pl-1" style={{ color: colors.textDark }}>Coming Soon</h3>
+                                <h3 className="text-lg font-medium mb-3 pl-1">Coming Soon</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    <CapabilityCard title="Auto Grading" icon={<CheckSquare className="w-5 h-5" />}>
-                                        <SwitchConfig label="Enable Autograder" path="capabilities.autograder.enabled" config={config} onChange={handleConfigChange} disabled={true} />
-                                        <CardDescription className="text-xs mt-1" style={{ color: colors.textDark + 'aa' }}>Supports closed-form (MCQ, T/F) and open-form questions.</CardDescription>
-                                        {config.capabilities.autograder.enabled && (
-                                            <div className="mt-4 pt-3 border-t" style={{ borderColor: colors.lightLavender + '80' }}>
-                                                <SwitchConfig
-                                                    label="Generate Feedback"
-                                                    path="capabilities.feedbackGenerator.enabled"
-                                                    config={config}
-                                                    onChange={handleConfigChange}
+                                    <Card className="h-full shadow-md">
+                                        <CardHeader className="pb-4">
+                                            <CardTitle className="text-foreground flex items-center gap-2">
+                                                <span className="text-foreground"><CheckSquare className="w-5 h-5" /></span> Auto Grading
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-4">
+                                            <div className="flex items-center justify-between space-x-4 py-1">
+                                                <Label htmlFor="capabilities.autograder.enabled" className="text-sm flex-1 cursor-not-allowed">Enable Autograder</Label>
+                                                <Switch
+                                                    id="capabilities.autograder.enabled"
+                                                    checked={getNestedValue(config, 'capabilities.autograder.enabled', false)}
                                                     disabled={true}
                                                 />
                                             </div>
-                                        )}
-                                    </CapabilityCard>
-                                    <CapabilityCard title="Teacher Assistant" icon={<UserCheck className="w-5 h-5" />}>
-                                        <SwitchConfig label="Enable Teacher Asst." path="capabilities.teacherAssistant.enabled" config={config} onChange={handleConfigChange} disabled={true} />
-                                    </CapabilityCard>
-                                    <CapabilityCard title="Personalized Recommendation" icon={<GraduationCap className="w-5 h-5" />}>
-                                        <SwitchConfig label="Enable Recommendations" path="capabilities.personalizedRecommendation.enabled" config={config} onChange={handleConfigChange} disabled={true} />
-                                    </CapabilityCard>
-                                    <CapabilityCard title="Learning Analytics" icon={<ListChecks className="w-5 h-5" />}>
-                                        <SwitchConfig label="Enable Analytics" path="capabilities.learningAnalytics.enabled" config={config} onChange={handleConfigChange} disabled={true} />
-                                    </CapabilityCard>
+                                            <p className="text-xs text-muted-foreground pt-1">Automatically grades student responses (MCQ, T/F, open-form).</p>
+                                            {getNestedValue(config, 'capabilities.autograder.enabled') && (
+                                                <div className="mt-4 pt-3 border-t">
+                                                    <div className="flex items-center justify-between space-x-4 py-1">
+                                                        <Label htmlFor="capabilities.feedbackGenerator.enabled" className="text-sm flex-1 cursor-not-allowed">Generate Feedback</Label>
+                                                        <Switch
+                                                            id="capabilities.feedbackGenerator.enabled"
+                                                            checked={getNestedValue(config, 'capabilities.feedbackGenerator.enabled', false)}
+                                                            disabled={true}
+                                                         />
+                                                    </div>
+                                                    <p className="text-xs text-muted-foreground pt-1">Helps teachers with tasks like lesson planning or finding resources.</p>
+                                                </div>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+                                    <Card className="h-full shadow-md">
+                                        <CardHeader className="pb-4">
+                                            <CardTitle className="text-foreground flex items-center gap-2">
+                                                <span className="text-foreground"><UserCheck className="w-5 h-5" /></span> Teacher Assistant
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-4">
+                                            <div className="flex items-center justify-between space-x-4 py-1">
+                                                <Label htmlFor="capabilities.teacherAssistant.enabled" className="text-sm flex-1 cursor-not-allowed">Enable Teacher Asst.</Label>
+                                                <Switch
+                                                    id="capabilities.teacherAssistant.enabled"
+                                                    checked={getNestedValue(config, 'capabilities.teacherAssistant.enabled', false)}
+                                                    disabled={true}
+                                                />
+                                            </div>
+                                            <p className="text-xs text-muted-foreground pt-1">Suggests relevant content or activities based on user interaction.</p>
+                                        </CardContent>
+                                    </Card>
+                                    <Card className="h-full shadow-md">
+                                        <CardHeader className="pb-4">
+                                            <CardTitle className="text-foreground flex items-center gap-2">
+                                                <span className="text-foreground"><GraduationCap className="w-5 h-5" /></span> Personalized Recommendation
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-4">
+                                            <div className="flex items-center justify-between space-x-4 py-1">
+                                                <Label htmlFor="capabilities.personalizedRecommendation.enabled" className="text-sm flex-1 cursor-not-allowed">Enable Recommendations</Label>
+                                                <Switch
+                                                    id="capabilities.personalizedRecommendation.enabled"
+                                                    checked={getNestedValue(config, 'capabilities.personalizedRecommendation.enabled', false)}
+                                                    disabled={true}
+                                                />
+                                            </div>
+                                            <p className="text-xs text-muted-foreground pt-1">Suggests relevant content or activities based on user interaction.</p>
+                                        </CardContent>
+                                    </Card>
+                                    <Card className="h-full shadow-md">
+                                        <CardHeader className="pb-4">
+                                            <CardTitle className="text-foreground flex items-center gap-2">
+                                                <span className="text-foreground"><ListChecks className="w-5 h-5" /></span> Learning Analytics
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-4">
+                                            <div className="flex items-center justify-between space-x-4 py-1">
+                                                <Label htmlFor="capabilities.learningAnalytics.enabled" className="text-sm flex-1 cursor-not-allowed">Enable Analytics</Label>
+                                                <Switch
+                                                    id="capabilities.learningAnalytics.enabled"
+                                                    checked={getNestedValue(config, 'capabilities.learningAnalytics.enabled', false)}
+                                                    disabled={true}
+                                                />
+                                            </div>
+                                            <p className="text-xs text-muted-foreground pt-1">Tracks and reports on student progress and interaction patterns.</p>
+                                        </CardContent>
+                                    </Card>
                                 </div>
                             </div>
                         </ScrollArea>
@@ -536,59 +739,77 @@ import { ContentAIWidget } from '@alef/ai-platform';
 
                     {currentStep === 3 && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <Card className="h-full shadow-md hover:shadow-lg transition-shadow border" style={{ backgroundColor: colors.textLight, borderColor: colors.border }}>
+                            <Card className="h-full shadow-md hover:shadow-lg transition-shadow">
                                 <CardHeader>
-                                    <CardTitle style={{ color: colors.textDark }}>RAG Configuration</CardTitle>
+                                    <CardTitle>RAG Configuration</CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
-                                    <SwitchConfig label="Enable RAG" path="capabilities.rag.enabled" config={config} onChange={handleConfigChange} />
-                                    {config.capabilities.rag.enabled && (
+                                    <div className="flex items-center justify-between space-x-4 py-1">
+                                        <Label htmlFor="capabilities.rag.enabled" className="text-sm flex-1">Enable RAG</Label>
+                                        <Switch
+                                            id="capabilities.rag.enabled"
+                                            checked={getNestedValue(config, 'capabilities.rag.enabled', false)}
+                                            onCheckedChange={(checked) => handleConfigChange('capabilities.rag.enabled', checked)}
+                                        />
+                                    </div>
+                                    {getNestedValue(config, 'capabilities.rag.enabled') && (
                                         <>
                                             <div className="space-y-2">
-                                                <Label style={{ color: colors.textDark + 'dd' }}>Alef Knowledge Bases</Label>
-                                                <div className="max-h-40 overflow-y-auto space-y-2 rounded-md border p-2" style={{ borderColor: colors.lightLavender }}>
+                                                <Label>Alef Knowledge Bases</Label>
+                                                <div className="max-h-40 overflow-y-auto space-y-2 rounded-md border p-2">
                                                     {mockKnowledgeBases.map(kb => (
                                                         <div key={kb.id} className="flex items-center space-x-2">
                                                             <Checkbox
                                                                 id={`kb-${kb.id}`}
-                                                                checked={config.capabilities.rag.knowledgeBaseIds.includes(kb.id)}
+                                                                checked={getNestedValue(config, 'capabilities.rag.knowledgeBaseIds', []).includes(kb.id)}
                                                                 onCheckedChange={(checked) => {
-                                                                    const currentIds = config.capabilities.rag.knowledgeBaseIds;
-                                                                    const newIds = checked ? [...currentIds, kb.id] : currentIds.filter(id => id !== kb.id);
+                                                                    const currentIds = getNestedValue(config, 'capabilities.rag.knowledgeBaseIds', []);
+                                                                    const newIds = checked ? [...currentIds, kb.id] : currentIds.filter((id: string) => id !== kb.id);
                                                                     handleConfigChange('capabilities.rag.knowledgeBaseIds', newIds);
                                                                 }}
-                                                                style={{ '--checkbox-color': colors.primary } as React.CSSProperties}
                                                             />
-                                                            <label htmlFor={`kb-${kb.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" style={{ color: colors.textDark }}>
+                                                            <label htmlFor={`kb-${kb.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                                                                 {kb.name} ({kb.source})
                                                             </label>
                                                         </div>
                                                     ))}
                                                 </div>
                                             </div>
-                                            <SelectConfig label="Retrieval Strategy" path="capabilities.rag.retrievalStrategy" config={config} onChange={handleConfigChange} options={[{ value: 'semantic', label: 'Semantic' }, { value: 'keyword', label: 'Keyword' }]} />
+                                            <div className="space-y-2">
+                                                <Label htmlFor="capabilities.rag.retrievalStrategy">Retrieval Strategy</Label>
+                                                <Select value={getNestedValue(config, 'capabilities.rag.retrievalStrategy')} onValueChange={(val) => handleConfigChange('capabilities.rag.retrievalStrategy', val)}>
+                                                    <SelectTrigger id="capabilities.rag.retrievalStrategy" className="w-full">
+                                                        <SelectValue placeholder="Select Strategy..." />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {[{ value: 'semantic', label: 'Semantic' }, { value: 'keyword', label: 'Keyword' }].map(opt => (
+                                                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
                                         </>
                                     )}
                                 </CardContent>
                             </Card>
 
-                            <Card className="h-full shadow-md hover:shadow-lg transition-shadow border" style={{ backgroundColor: colors.textLight, borderColor: colors.border }}>
+                            <Card className="h-full shadow-md hover:shadow-lg transition-shadow">
                                 <CardHeader>
-                                    <CardTitle style={{ color: colors.textDark }}>Custom Knowledge Bases</CardTitle>
-                                    <CardDescription style={{ color: colors.textDark + 'aa' }}>Connect your own knowledge sources.</CardDescription>
+                                    <CardTitle>Custom Knowledge Bases</CardTitle>
+                                    <CardDescription>Connect your own knowledge sources.</CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
-                                    <div className="flex items-center justify-between space-x-4 py-1 border-b" style={{ borderColor: colors.lightLavender + '80' }}>
-                                        <Label className="text-sm flex-1" style={{ color: colors.textDark + 'dd' }}>Shared Drive</Label>
-                                        <Button variant="outline" size="sm" style={{ backgroundColor: colors.lightLavender + '40', borderColor: colors.lightLavender }}>Connect</Button>
+                                    <div className="flex items-center justify-between space-x-4 py-1 border-b">
+                                        <Label className="text-sm flex-1 text-muted-foreground">Shared Drive</Label>
+                                        <Button variant="outline" size="sm">Connect</Button>
                                     </div>
-                                    <div className="flex items-center justify-between space-x-4 py-1 border-b" style={{ borderColor: colors.lightLavender + '80' }}>
-                                        <Label className="text-sm flex-1" style={{ color: colors.textDark + 'dd' }}>Upload PDFs</Label>
-                                        <Button variant="outline" size="sm" style={{ backgroundColor: colors.lightLavender + '40', borderColor: colors.lightLavender }}>Upload</Button>
+                                    <div className="flex items-center justify-between space-x-4 py-1 border-b">
+                                        <Label className="text-sm flex-1 text-muted-foreground">Upload PDFs</Label>
+                                        <Button variant="outline" size="sm">Upload</Button>
                                     </div>
                                     <div className="flex items-center justify-between space-x-4 py-1">
-                                        <Label className="text-sm flex-1" style={{ color: colors.textDark + 'dd' }}>Website URL</Label>
-                                        <Input placeholder="Enter URL..." className="max-w-[150px] h-8" style={{ backgroundColor: colors.lightLavender + '40', borderColor: colors.lightLavender }} />
+                                        <Label className="text-sm flex-1 text-muted-foreground">Website URL</Label>
+                                        <Input placeholder="Enter URL..." className="max-w-[150px] h-8" />
                                     </div>
                                 </CardContent>
                             </Card>
@@ -597,55 +818,146 @@ import { ContentAIWidget } from '@alef/ai-platform';
 
                     {currentStep === 4 && (
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <Card className="h-full shadow-md hover:shadow-lg transition-shadow border" style={{ backgroundColor: colors.textLight, borderColor: colors.border }}>
-                                <CardHeader><CardTitle style={{ color: colors.textDark }}>Pedagogical Guardrails</CardTitle></CardHeader>
+                            <Card className="h-full shadow-md hover:shadow-lg transition-shadow">
+                                <CardHeader><CardTitle>Pedagogical Guardrails</CardTitle></CardHeader>
                                 <CardContent className="space-y-4">
-                                    <SelectConfig label="Teaching Style" path="behavior.pedagogical.style" config={config} onChange={handleConfigChange} options={[{ value: 'direct', label: 'Direct' }, { value: 'socratic', label: 'Socratic' }, { value: 'interactive', label: 'Interactive' }]} />
-                                    <InputConfig label="Complexity (e.g., Grade Level)" path="behavior.pedagogical.complexity" type="number" config={config} onChange={handleConfigChange} />
-                                    <SelectConfig label="Pacing" path="behavior.pedagogical.pacing" config={config} onChange={handleConfigChange} options={[{ value: 'adaptive', label: 'Adaptive' }, { value: 'fixed', label: 'Fixed' }]} />
-                                    <InputConfig label="Feedback Style" path="behavior.pedagogical.feedbackStyle" config={config} onChange={handleConfigChange} placeholder="e.g., encouraging, critical" />
+                                    <div className="space-y-2">
+                                        <Label htmlFor="behavior.pedagogical.style">Teaching Style</Label>
+                                        <Select value={getNestedValue(config, 'behavior.pedagogical.style')} onValueChange={(val) => handleConfigChange('behavior.pedagogical.style', val)}>
+                                            <SelectTrigger id="behavior.pedagogical.style" className="w-full">
+                                                <SelectValue placeholder="Select Style..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {[{ value: 'direct', label: 'Direct' }, { value: 'socratic', label: 'Socratic' }, { value: 'interactive', label: 'Interactive' }].map(opt => (
+                                                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="behavior.pedagogical.complexity">Complexity (e.g., Grade Level)</Label>
+                                        <Input
+                                            id="behavior.pedagogical.complexity"
+                                            type="number"
+                                            value={getNestedValue(config, 'behavior.pedagogical.complexity', '')}
+                                            onChange={(e) => handleConfigChange('behavior.pedagogical.complexity', parseFloat(e.target.value) || 0)}
+                                            placeholder="e.g., 5"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="behavior.pedagogical.pacing">Pacing</Label>
+                                        <Select value={getNestedValue(config, 'behavior.pedagogical.pacing')} onValueChange={(val) => handleConfigChange('behavior.pedagogical.pacing', val)}>
+                                            <SelectTrigger id="behavior.pedagogical.pacing" className="w-full">
+                                                <SelectValue placeholder="Select Pacing..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {[{ value: 'adaptive', label: 'Adaptive' }, { value: 'fixed', label: 'Fixed' }].map(opt => (
+                                                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="behavior.pedagogical.feedbackStyle">Feedback Style</Label>
+                                        <Input
+                                            id="behavior.pedagogical.feedbackStyle"
+                                            value={getNestedValue(config, 'behavior.pedagogical.feedbackStyle', '')}
+                                            onChange={(e) => handleConfigChange('behavior.pedagogical.feedbackStyle', e.target.value)}
+                                            placeholder="e.g., encouraging, critical"
+                                        />
+                                    </div>
                                 </CardContent>
                             </Card>
-                            <Card className="h-full shadow-md hover:shadow-lg transition-shadow border" style={{ backgroundColor: colors.textLight, borderColor: colors.border }}>
-                                <CardHeader><CardTitle style={{ color: colors.textDark }}>Cultural Guardrails</CardTitle></CardHeader>
+                            <Card className="h-full shadow-md hover:shadow-lg transition-shadow">
+                                <CardHeader><CardTitle>Cultural Guardrails</CardTitle></CardHeader>
                                 <CardContent className="space-y-4">
-                                    <InputConfig label="Region" path="behavior.cultural.region" config={config} onChange={handleConfigChange} placeholder="e.g., UAE, Global" />
-                                    <SelectConfig label="Language Style" path="behavior.cultural.languageStyle" config={config} onChange={handleConfigChange} options={[{ value: 'formal', label: 'Formal' }, { value: 'casual', label: 'Casual' }]} />
-                                    <SelectConfig label="Example Type" path="behavior.cultural.examples" config={config} onChange={handleConfigChange} options={[{ value: 'localized', label: 'Localized' }, { value: 'global', label: 'Global' }]} />
+                                    <div className="space-y-2">
+                                        <Label htmlFor="behavior.cultural.region">Region</Label>
+                                        <Input
+                                            id="behavior.cultural.region"
+                                            value={getNestedValue(config, 'behavior.cultural.region', '')}
+                                            onChange={(e) => handleConfigChange('behavior.cultural.region', e.target.value)}
+                                            placeholder="e.g., UAE, Global"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="behavior.cultural.languageStyle">Language Style</Label>
+                                        <Select value={getNestedValue(config, 'behavior.cultural.languageStyle')} onValueChange={(val) => handleConfigChange('behavior.cultural.languageStyle', val)}>
+                                            <SelectTrigger id="behavior.cultural.languageStyle" className="w-full">
+                                                <SelectValue placeholder="Select Style..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {[{ value: 'formal', label: 'Formal' }, { value: 'casual', label: 'Casual' }].map(opt => (
+                                                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="behavior.cultural.examples">Example Type</Label>
+                                        <Select value={getNestedValue(config, 'behavior.cultural.examples')} onValueChange={(val) => handleConfigChange('behavior.cultural.examples', val)}>
+                                            <SelectTrigger id="behavior.cultural.examples" className="w-full">
+                                                <SelectValue placeholder="Select Type..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {[{ value: 'localized', label: 'Localized' }, { value: 'global', label: 'Global' }].map(opt => (
+                                                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
                                 </CardContent>
                             </Card>
-                            <Card className="h-full shadow-md hover:shadow-lg transition-shadow border" style={{ backgroundColor: colors.textLight, borderColor: colors.border }}>
-                                <CardHeader><CardTitle style={{ color: colors.textDark }}>Language Guardrails</CardTitle></CardHeader>
+                            <Card className="h-full shadow-md hover:shadow-lg transition-shadow">
+                                <CardHeader><CardTitle>Language Guardrails</CardTitle></CardHeader>
                                 <CardContent className="space-y-4">
-                                    <SelectConfig label="Primary Language" path="behavior.language.primary" config={config} onChange={handleConfigChange} options={[{ value: 'en', label: 'English' }, { value: 'ar', label: 'Arabic' }]} />
-                                    <SwitchConfig label="Enable Translation Feature" path="behavior.language.translation" config={config} onChange={handleConfigChange} />
+                                    <div className="space-y-2">
+                                        <Label htmlFor="behavior.language.primary">Primary Language</Label>
+                                        <Select value={getNestedValue(config, 'behavior.language.primary')} onValueChange={(val) => handleConfigChange('behavior.language.primary', val)}>
+                                            <SelectTrigger id="behavior.language.primary" className="w-full">
+                                                <SelectValue placeholder="Select Language..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {[{ value: 'en', label: 'English' }, { value: 'ar', label: 'Arabic' }].map(opt => (
+                                                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="flex items-center justify-between space-x-4 py-1">
+                                        <Label htmlFor="behavior.language.translation" className="text-sm flex-1">Enable Translation Feature</Label>
+                                        <Switch
+                                            id="behavior.language.translation"
+                                            checked={getNestedValue(config, 'behavior.language.translation', false)}
+                                            onCheckedChange={(checked) => handleConfigChange('behavior.language.translation', checked)}
+                                        />
+                                    </div>
                                 </CardContent>
                             </Card>
                         </div>
                     )}
 
                     {currentStep === 5 && (
-                        <Card className="h-full shadow-md hover:shadow-lg transition-shadow border" style={{ backgroundColor: colors.textLight, borderColor: colors.border }}>
-                            <CardHeader><CardTitle style={{ color: colors.textDark }}>Review Configuration & Get Code</CardTitle></CardHeader>
+                        <Card className="h-full shadow-md hover:shadow-lg transition-shadow">
+                            <CardHeader><CardTitle>Review Configuration & Get Code</CardTitle></CardHeader>
                             <CardContent>
                                 <div className="space-y-4">
                                     <div className="relative">
-                                        <pre className="p-4 rounded-lg overflow-x-auto max-h-[400px]" style={{ backgroundColor: colors.lightLavender + '40' }}>
-                                            <code style={{ color: colors.textDark }}>{generateCode()}</code>
+                                        <pre className="p-4 rounded-lg overflow-x-auto max-h-[400px] bg-muted">
+                                            <code className="text-muted-foreground">{generateCode()}</code>
                                         </pre>
                                         <Button
                                             variant="outline"
                                             size="icon"
-                                            className="absolute top-2 right-2 h-7 w-7 transition-colors"
-                                            style={{ backgroundColor: colors.lightLavender + '80', borderColor: colors.lightLavender, color: colors.purple }}
+                                            className="absolute top-2 right-2 h-7 w-7"
                                             onClick={() => { navigator.clipboard.writeText(generateCode()); toast({ title: "Code Copied!" }); }}
                                         >
                                             <Copy className="h-4 w-4" />
                                         </Button>
                                     </div>
                                     <div className="space-y-2">
-                                        <h3 className="font-medium" style={{ color: colors.textDark }}>Integration Steps:</h3>
-                                        <ol className="list-decimal list-inside space-y-1 text-sm" style={{ color: colors.textDark + 'aa' }}>
+                                        <h3 className="font-medium">Integration Steps:</h3>
+                                        <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground">
                                             <li>Install the AI Platform package: `npm install @alef/ai-platform`</li>
                                             <li>Import the `ContentAIWidget` component in your application.</li>
                                             <li>Copy the configuration object generated above.</li>
@@ -659,17 +971,12 @@ import { ContentAIWidget } from '@alef/ai-platform';
                     )}
                 </div>
 
-                <div className="flex justify-between items-center pt-6 mt-6 border-t" style={{ borderColor: colors.lightLavender }}>
+                <div className="flex justify-between items-center pt-6 mt-6 border-t">
                     <Button
                         variant="outline"
                         onClick={handlePreviousStep}
                         disabled={currentStep === 1}
-                        className="w-[100px] transition-colors disabled:opacity-50"
-                        style={{
-                            backgroundColor: colors.lightLavender + '80',
-                            borderColor: colors.lightLavender,
-                            color: colors.textDark
-                        }}
+                        className="w-[100px]"
                     >
                         <ArrowLeft className="h-4 w-4 mr-2" />
                         Previous
@@ -678,10 +985,7 @@ import { ContentAIWidget } from '@alef/ai-platform';
                     {currentStep < STEPS.length ? (
                         <Button
                             onClick={handleNextStep}
-                            className="w-[100px] text-white shadow-lg hover:shadow-xl transition-all"
-                            style={{ backgroundColor: colors.primary, '--hover-bg': colors.primary + 'dd' } as React.CSSProperties}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = e.currentTarget.style.getPropertyValue('--hover-bg')}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = colors.primary}
+                            className="w-[100px]"
                         >
                             Next
                             <ArrowRight className="h-4 w-4 ml-2" />
@@ -689,10 +993,7 @@ import { ContentAIWidget } from '@alef/ai-platform';
                     ) : (
                         <Button
                             onClick={handleSaveConfig}
-                            className="w-[140px] text-white shadow-lg hover:shadow-xl transition-all"
-                            style={{ backgroundColor: colors.purple, '--hover-bg': colors.purple + 'dd' } as React.CSSProperties}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = e.currentTarget.style.getPropertyValue('--hover-bg')}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = colors.purple}
+                            className="w-[140px] bg-foreground hover:bg-foreground/80 text-background"
                         >
                             <Save className="h-4 w-4 mr-2" />
                             Save Experience
@@ -701,111 +1002,6 @@ import { ContentAIWidget } from '@alef/ai-platform';
                 </div>
             </CardContent>
         </Card>
-    );
-};
-
-interface CapabilityCardProps {
-    title: string;
-    icon: React.ReactNode;
-    children: React.ReactNode;
-}
-const CapabilityCard: React.FC<CapabilityCardProps> = ({ title, icon, children }) => (
-    <Card className="h-full shadow-md hover:shadow-lg transition-all border" style={{ background: `linear-gradient(to bottom right, ${colors.textLight}, ${colors.lightLavender + '40'})`, borderColor: colors.border }}>
-        <CardHeader className="pb-4">
-            <CardTitle className="text-base font-semibold flex items-center gap-2" style={{ color: colors.textDark }}>
-                <span style={{ color: colors.primary }}>{icon}</span> {title}
-            </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-            {children}
-        </CardContent>
-    </Card>
-);
-
-interface ConfigControlProps {
-    label: string;
-    path: string; // e.g., 'capabilities.chat.enabled'
-    config: AIExperienceConfig;
-    onChange: (path: string, value: any) => void;
-}
-
-interface SwitchConfigProps extends ConfigControlProps {
-    disabled?: boolean;
-}
-const SwitchConfig: React.FC<SwitchConfigProps> = ({ label, path, config, onChange, disabled = false }) => {
-    const value = path.split('.').reduce((o, k) => o?.[k], config) ?? false;
-    return (
-        <div className={`flex items-center justify-between space-x-4 py-1 group ${disabled ? 'opacity-70' : ''}`}>
-            <Label htmlFor={path} className={`text-sm flex-1 transition-colors ${disabled ? 'cursor-not-allowed' : ''}`} style={{ color: colors.textDark + 'dd', '--hover-color': colors.textDark } as React.CSSProperties}
-                onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.color = e.currentTarget.style.getPropertyValue('--hover-color'); }}
-                onMouseLeave={(e) => { if (!disabled) e.currentTarget.style.color = colors.textDark + 'dd'; }}
-            >{label}</Label>
-            <Switch
-                id={path}
-                checked={Boolean(value)}
-                onCheckedChange={(checked) => onChange(path, checked)}
-                style={{
-                    '--switch-bg-checked': colors.primary,
-                    '--switch-bg-unchecked': colors.lightLavender
-                } as React.CSSProperties}
-                disabled={disabled}
-            />
-        </div>
-    );
-};
-
-interface SelectConfigProps extends ConfigControlProps {
-    options: { value: string; label: string }[];
-    placeholder?: string;
-}
-const SelectConfig: React.FC<SelectConfigProps> = ({ label, path, config, onChange, options, placeholder }) => {
-    const value = path.split('.').reduce((o, k) => o?.[k], config);
-    return (
-        <div className="space-y-2 group">
-            <Label htmlFor={path} className="text-sm transition-colors" style={{ color: colors.textDark + 'dd', '--hover-color': colors.textDark } as React.CSSProperties}
-                onMouseEnter={(e) => e.currentTarget.style.color = e.currentTarget.style.getPropertyValue('--hover-color')}
-                onMouseLeave={(e) => e.currentTarget.style.color = colors.textDark + 'dd'}
-            >{label}</Label>
-            <Select value={value as string | undefined} onValueChange={(val) => onChange(path, val)}>
-                <SelectTrigger
-                    id={path}
-                    className="w-full transition-colors"
-                    style={{ backgroundColor: colors.lightLavender + '40', borderColor: colors.lightLavender, color: colors.textDark }}
-                >
-                    <SelectValue placeholder={placeholder || `Select ${label}...`} />
-                </SelectTrigger>
-                <SelectContent style={{ backgroundColor: colors.textLight, borderColor: colors.lightLavender }}>
-                    {options.map(opt => (
-                        <SelectItem key={opt.value} value={opt.value} style={{ color: colors.textDark }}>{opt.label}</SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
-        </div>
-    );
-};
-
-interface InputConfigProps extends ConfigControlProps {
-    placeholder?: string;
-    type?: React.HTMLInputTypeAttribute;
-}
-const InputConfig: React.FC<InputConfigProps> = ({ label, path, config, onChange, placeholder, type = 'text' }) => {
-    const value = path.split('.').reduce((o, k) => o?.[k], config) ?? '';
-    return (
-        <div className="space-y-2 group">
-            <Label htmlFor={path} className="text-sm transition-colors" style={{ color: colors.textDark + 'dd', '--hover-color': colors.textDark } as React.CSSProperties}
-                onMouseEnter={(e) => e.currentTarget.style.color = e.currentTarget.style.getPropertyValue('--hover-color')}
-                onMouseLeave={(e) => e.currentTarget.style.color = colors.textDark + 'dd'}
-            >{label}</Label>
-            <Input
-                id={path}
-                type={type}
-                value={value}
-                onChange={(e) => onChange(path, type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value)}
-                placeholder={placeholder}
-                className="w-full transition-colors"
-                style={{ backgroundColor: colors.lightLavender + '40', borderColor: colors.lightLavender, color: colors.textDark }}
-            />
-        </div>
     );
 };
 

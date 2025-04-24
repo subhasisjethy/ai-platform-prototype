@@ -73,7 +73,6 @@ export interface TranslatorConfig {
 
 export interface SimplifierConfig {
     enabled: boolean;
-    targetGradeLevel?: number;
     prompt?: string;
 }
 
@@ -120,8 +119,10 @@ export interface RagConfig {
 // AI Tutor Configuration (could be part of chat or separate)
 export interface AITutorConfig {
     enabled: boolean;
-    persona?: 'guide' | 'mentor' | 'expert';
+    persona?: 'mentor' | 'teacher' | 'peer' | 'smart';
     proactiveEngagement?: boolean;
+    isSpecialized?: boolean;
+    specializedSubject?: 'math_en' | 'math_ar' | 'en' | 'sci' | 'ar' | null;
     prompt?: string;
 }
 
@@ -230,6 +231,10 @@ export interface QualityMetrics {
 export const defaultAIConfig: AIExperienceConfig = {
     configId: 'default-config',
     configName: 'Default Video Experience',
+    productLine: 'CCL',
+    productName: 'CCL Platform',
+    integrationContext: 'CCL',
+    targetUser: 'CCL',
     content: {
         type: 'video',
         id: 'ccl-video-123',
@@ -261,10 +266,11 @@ export const defaultAIConfig: AIExperienceConfig = {
             prompt: 'This is a default prompt for the RAG configuration'
         },
         aiTutor: {
-            enabled: true,
-            persona: 'guide',
+            enabled: false,
+            persona: 'mentor',
             proactiveEngagement: false,
-            prompt: 'This is a default prompt for the AI Tutor configuration'
+            isSpecialized: false,
+            specializedSubject: null
         },
 
         // Helpers
@@ -352,7 +358,7 @@ export const bookAIConfigExample: AIExperienceConfig = {
         },
         aiTutor: {
             enabled: true,
-            persona: 'socratic',
+            persona: 'mentor',
             proactiveEngagement: true,
             prompt: 'This is a default prompt for the book AI Tutor configuration'
         },
@@ -369,7 +375,6 @@ export const bookAIConfigExample: AIExperienceConfig = {
         },
         simplifier: {
             enabled: true,
-            targetGradeLevel: 8,
             prompt: 'This is a default prompt for the book simplifier configuration'
         },
         // scaffolder: { enabled: false },
@@ -414,7 +419,35 @@ export const savedConfigs: AIExperienceConfig[] = [
 
 // Mock CCL Content Items
 export const mockCCLContent = [
-    { id: 'ccl-video-123', title: 'Grade 5 Math - Fractions Explained', type: 'video' },
+    {
+        id: 'ccl-video-123',
+        title: 'Introduction to Algebra',
+        type: 'video' as ContentType,
+        source: 'CCL' as ContentSource,
+        config: {
+            ...defaultAIConfig, // Base config
+            configName: 'Algebra Video AI',
+            capabilities: {
+                ...defaultAIConfig.capabilities,
+                aiTutor: {
+                    enabled: true,
+                    persona: 'mentor',
+                    proactiveEngagement: true,
+                    isSpecialized: false,
+                    specializedSubject: null
+                },
+                questionGenerator: { enabled: true },
+                summarizer: { enabled: true, format: 'bullet_points' },
+            },
+            behavior: {
+                ...defaultAIConfig.behavior,
+                pedagogical: {
+                    ...defaultAIConfig.behavior.pedagogical,
+                    style: 'interactive'
+                }
+            }
+        }
+    },
     { id: 'ccl-video-456', title: 'Grade 7 Science - The Solar System', type: 'video' },
     { id: 'ccl-book-456', title: 'Grade 9 Literature - Classic Short Stories', type: 'book' },
     { id: 'ccl-book-789', title: 'Grade 6 History - Ancient Civilizations', type: 'book' },
