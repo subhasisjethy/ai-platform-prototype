@@ -38,6 +38,7 @@ import { Input } from "@/components/ui/input";
 import { AIExperienceConfig, defaultAIConfig, savedConfigs } from '@/types/ai-platform';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { toast } from "@/components/ui/use-toast";
 
 interface DashboardProps {
   username?: string;
@@ -207,7 +208,7 @@ const Dashboard = ({
               <NavButton icon={MessageSquare} label="Chat Preview" active={activeTab === "chat"} onClick={() => setActiveTab("chat")} sidebarOpen={isSidebarOpen} />
               <Separator className="my-2" />
               <NavButton icon={BookOpen} label="Documentation" active={activeTab === "documentation"} onClick={() => setActiveTab("documentation")} sidebarOpen={isSidebarOpen} />
-              <NavButton icon={Key} label="API Keys" active={activeTab === "apikeys"} onClick={() => setActiveTab("apikeys")} sidebarOpen={isSidebarOpen} />
+              <NavButton icon={Key} label="Credentials" active={activeTab === "apikeys"} onClick={() => setActiveTab("apikeys")} sidebarOpen={isSidebarOpen} />
               <NavButton icon={BarChart3} label="Analytics" active={activeTab === "analytics"} onClick={() => setActiveTab("analytics")} sidebarOpen={isSidebarOpen} />
               <NavButton icon={Settings} label="Settings" active={activeTab === "settings"} onClick={() => setActiveTab("settings")} sidebarOpen={isSidebarOpen} />
             </nav>
@@ -346,9 +347,6 @@ const Dashboard = ({
                         )}
                       </div>
                       <div className="flex gap-2 p-4 border-t">
-                        {chatPreviewConfig.capabilities.voice?.enabled && (
-                          <Button variant="outline" size="icon" className="shrink-0" title="Voice Input (Mock)"><Mic className="h-4 w-4" /></Button>
-                        )}
                         <Input
                           value={inputMessage}
                           onChange={(e) => setInputMessage(e.target.value)}
@@ -370,7 +368,32 @@ const Dashboard = ({
               </TabsContent>
 
               <TabsContent value="apikeys">
-                <Card><CardHeader><CardTitle>API Keys</CardTitle></CardHeader><CardContent><p>Manage your API keys here.</p></CardContent></Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Experience Credentials</CardTitle>
+                    <CardDescription>View endpoint details and credentials for your deployed AI experiences.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {mockExperienceStats.length > 0 ? (
+                        mockExperienceStats.map((exp) => (
+                          <div key={exp.id} className="flex items-center justify-between p-3 border rounded-md bg-muted/30">
+                            <span className="font-medium text-sm">{exp.name}</span>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => toast({ title: "View Details", description: `Details for ${exp.name} requested.` })}
+                            >
+                              View Details
+                            </Button>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-muted-foreground text-sm">No deployed experiences found.</p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
               </TabsContent>
 
               <TabsContent value="analytics">
